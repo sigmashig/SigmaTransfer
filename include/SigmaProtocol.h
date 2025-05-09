@@ -28,10 +28,14 @@ public:
     virtual void Connect() = 0;
     virtual bool IsConnected() = 0;
     virtual bool IsWiFiRequired() { return isWiFiRequired; };
-    virtual bool Begin() = 0;
-   
+    virtual bool BeginSetup() = 0;
+    virtual bool FinalizeSetup() = 0;
+    virtual String GetName()=0;
+    virtual void SetName(String name)=0;
+
 protected:
     bool isWiFiRequired = false;
+    
 private:
     
 

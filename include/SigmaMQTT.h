@@ -17,7 +17,7 @@ typedef struct {
     String topic;
     String username="";
     String password="";
-    String clientId="Client_"+String(ESP.getEfuseMac());
+    String clientId="Client_"+String(ESP.getEfuseMac(),HEX);
 } MqttConfig;
 
 
@@ -33,7 +33,8 @@ public:
 
     //void Init(String url, uint16_t port = 1883, String user = "", String pwd = "", String clientId = "");
     void SetParams(MqttConfig config);
-    bool Begin();
+    bool BeginSetup();
+    bool FinalizeSetup();
     void Subscribe(TopicSubscription subscriptionTopic, String rootTopic = "");
     void Subscribe(String topic)
     {
@@ -50,12 +51,15 @@ public:
     void Disconnect();
     bool IsConnected();
     bool IsWiFiRequired() { return true; };
+    String GetName() { return name; };
+    void SetName(String name) { Serial.printf("SetName=%s\n",name.c_str()); this->name = name; };
 private:
 
     MqttConfig config;
     inline static SigmaLoger *MLogger = new SigmaLoger(512);
     static void ConnectToMqtt();
 
+    inline static String name;
     inline static TimerHandle_t mqttReconnectTimer;
     inline static String clientId;
     inline static AsyncMqttClient mqttClient;

@@ -14,17 +14,23 @@ public:
     bool AddProtocol(String name, SigmaProtocol *protocol);
     bool AddChannel(SigmaChannel *channel);
     bool Begin();
+    void StopWiFi();
+    void StartWiFi();
+
 
 private:
-    inline static SigmaLoger *PLogger = new SigmaLoger(512);
-    String ssid = "";
-    String wifiPassword = "";
+    SigmaLoger *PLogger = new SigmaLoger(512);
+    inline static String ssid = "";
+    inline static String wifiPassword = "";
+    bool isWiFiStopped = false;
+    TimerHandle_t wifiReconnectTimer;
 
     std::map<String, SigmaProtocol *> protocols;
     std::map<String, SigmaChannel *> channels;
 
-    void startWiFi(String ssid, String password);
     bool isWiFiRequired();
+    static void ConnectToWifi();
+
 };
 
 #endif

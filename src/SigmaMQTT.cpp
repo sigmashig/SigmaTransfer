@@ -2,13 +2,23 @@
 #include <esp_event.h>
 #include <WiFi.h>
 
-ESP_EVENT_DEFINE_BASE(SIGMAMQTT_EVENT);
+//ESP_EVENT_DEFINE_BASE(SIGMAMQTT_EVENT);
 
 
 
 SigmaMQTT::SigmaMQTT(MqttConfig config)
 {
     SetParams(config);
+    mqttClient.onConnect(onMqttConnect);
+    mqttClient.onDisconnect(onMqttDisconnect);
+    // mqttClient.onSubscribe(onMqttSubscribe);
+    // mqttClient.onUnsubscribe(onMqttUnsubscribe);
+    mqttClient.onMessage(onMqttMessage);
+    // mqttClient.onPublish(onMqttPublish);
+
+    mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(ConnectToMqtt));
+    // MLogger->Internal("MAP CLEAR");
+    eventMap.clear();
 }
 
 void SigmaMQTT::SetParams(MqttConfig config)
@@ -32,12 +42,12 @@ void SigmaMQTT::SetParams(MqttConfig config)
     {
         IPAddress ip;
         ip.fromString(config.server);
-        MLogger->Append("IP: ").Append(ip.toString()).Internal();
+        //MLogger->Append("IP: ").Append(ip.toString()).Internal();
         mqttClient.setServer(ip, config.port);
     }
     else
     {
-        MLogger->Append("URL: ").Append(config.server).Internal();
+        //MLogger->Append("URL: ").Append(config.server).Internal();
         mqttClient.setServer(config.server.c_str(), config.port);
     }
     if (config.clientId == "") {
@@ -55,18 +65,13 @@ SigmaMQTT::SigmaMQTT()
 {
 }
 
-bool SigmaMQTT::Begin()
+bool SigmaMQTT::BeginSetup()
 {
-    mqttClient.onConnect(onMqttConnect);
-    mqttClient.onDisconnect(onMqttDisconnect);
-    // mqttClient.onSubscribe(onMqttSubscribe);
-    // mqttClient.onUnsubscribe(onMqttUnsubscribe);
-    mqttClient.onMessage(onMqttMessage);
-    // mqttClient.onPublish(onMqttPublish);
+    return true;
+}
 
-    mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(ConnectToMqtt));
-    // MLogger->Internal("MAP CLEAR");
-    eventMap.clear();
+bool SigmaMQTT::FinalizeSetup()
+{
     return true;
 }
 
@@ -134,20 +139,17 @@ bool SigmaMQTT::IsConnected()
 }
 void SigmaMQTT::onMqttConnect(bool sessionPresent)
 {
-    MLogger->Internal("Connected to MQTT");
-    MLogger->Internal("Auto Subscribing...");
-    MLogger->Append("Map size(1): ").Append(eventMap.size()).Internal();
-    esp_err_t res = esp_event_post(SIGMAMQTT_EVENT, PROTOCOL_CONNECTED, (void *)"", 1, portMAX_DELAY);
+    MLogger->Append("Posting connected event for ").Append(name).Internal();
+    esp_err_t res = esp_event_post(SIGMAMQTT_EVENT, PROTOCOL_CONNECTED, (void*) (name.c_str()), name.length()+1, portMAX_DELAY);
     for (auto const &x : eventMap)
     {
         // MLogger->Append("Subscribing to ").Append(x.first).Internal();
         if (x.second.isReSubscribe)
         {
-            //   MLogger->Append("Subscribing to ").Append(x.first).Internal();
+            //   MLogger->Append("Subscribe to ").Append(x.first).Internal();
             mqttClient.subscribe(x.first.c_str(), 0);
         }
     }
-    // MLogger->Internal("Subscribed");
 }
 
 void SigmaMQTT::onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)

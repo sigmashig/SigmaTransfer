@@ -4,6 +4,8 @@
 #include <SigmaChannel.h>
 
 SigmaTransfer *Transfer;
+SigmaChannel *Channel;
+SigmaChannel *Channel2;
 
 enum {
   EVENT_TEST1 = 0x80,
@@ -14,9 +16,83 @@ enum {
 } MY_EVENT_IDS;
 
 
+void TestMqtt()
+{
+    Serial.println("Sending message");
+
+  Channel->Send("t3","Hello, World!");
+  Channel2->Send("t4","Hello, World!");
+
+}
+
+void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+  Serial.println(" protocolEventHandler ");
+  Log->Append("Protocol event: ").Append(event_id).Internal();
+  if (strcmp(SIGMAMQTT_EVENT, event_base) == 0)
+  {
+
+    if (event_id == PROTOCOL_CONNECTED)
+    {
+      String name = (char *)event_data;
+      Log->Append("MQTT connected: ").Append(name).Internal();
+      TestMqtt();
+    }
+    else if (event_id == EVENT_TEST1)
+    {
+      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
+      Log->Append("EVENT_TEST1:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
+    }
+    else if (event_id == EVENT_TEST2)
+    {
+      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
+      Log->Append("EVENT_TEST2:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
+    }
+    else if (event_id == PROTOCOL_DISCONNECTED)
+    {
+      String name = (char *)event_data;
+      Log->Append("MQTT disconnected: ").Append(name).Internal();
+    }
+    else if (event_id == PROTOCOL_MESSAGE)
+    {
+      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
+      Log->Append("SIGMAMQTT_MESSAGE:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
+    }
+
+    else
+    {
+      Log->Internal("Unknown event");
+    }
+  }
+}
+
+
+
 void setup() {
   Serial.begin(115200);
   Serial.println("----Hello, World!-----");
+  Log = new SigmaLoger(512);
+  esp_err_t espErr = ESP_OK;
+
+  esp_event_loop_create_default();
+  if (espErr != ESP_OK && espErr != ESP_ERR_INVALID_STATE)
+  {
+    Log->Printf(F("Failed to create default event loop: %d"), espErr).Internal();
+  }
+
+  delay(100);
+  
+
+  espErr = esp_event_handler_instance_register(SIGMAMQTT_EVENT,
+                                            ESP_EVENT_ANY_ID,
+                                            protocolEventHandler,
+                                            NULL,
+                                            NULL);
+  if (espErr != ESP_OK)
+  {
+    Log->Printf("Failed to register event handler: %d", espErr).Internal();
+  }
+
 
   // init protocols
   Transfer = new SigmaTransfer("Sigma", "kybwynyd");
@@ -35,7 +111,7 @@ void setup() {
   channelConfig1.crypt = NULL;
 
 
-  SigmaChannel *Channel = new SigmaChannel(channelConfig1);
+  Channel = new SigmaChannel(channelConfig1);
   Transfer->AddChannel(Channel);
 
   SigmaChannelConfig channelConfig2;
@@ -44,7 +120,7 @@ void setup() {
   channelConfig2.rootTopic = "test/test2/";
   channelConfig2.crypt = NULL;
 
-  SigmaChannel *Channel2 = new SigmaChannel(channelConfig2);
+  Channel2 = new SigmaChannel(channelConfig2);
   Transfer->AddChannel(Channel2);
 
   // Subscribe to channel topics
@@ -78,9 +154,6 @@ if (Transfer->Begin())
   
 
   // Send message
-  Serial.println("Sending message");
-  Channel->Send("t3","Hello, World!");
-  Channel2->Send("t3","Hello, World!");
 
 
   }
