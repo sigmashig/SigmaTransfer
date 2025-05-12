@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SigmaTransfer.h>
-#include <SigmaMQTT.h>
+#include <SigmaUART.h>
 #include <SigmaChannel.h>
 
 SigmaTransfer *Transfer;
@@ -16,7 +16,7 @@ enum {
 } MY_EVENT_IDS;
 
 
-void TestMqtt()
+void TestMessaging()
 {
     Serial.println("Sending message");
 
@@ -29,34 +29,34 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 {
   Serial.println(" protocolEventHandler ");
   Log->Append("Protocol event: ").Append(event_id).Internal();
-  if (strcmp(SIGMAMQTT_EVENT, event_base) == 0)
+  if (strcmp(SIGMATRANSFER_EVENT, event_base) == 0)
   {
 
     if (event_id == PROTOCOL_CONNECTED)
     {
       String name = (char *)event_data;
-      Log->Append("MQTT connected: ").Append(name).Internal();
-      TestMqtt();
+      Log->Append("Protocol connected: ").Append(name).Internal();
+      TestMessaging();
     }
     else if (event_id == EVENT_TEST1)
     {
-      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
+      SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
       Log->Append("EVENT_TEST1:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
     }
     else if (event_id == EVENT_TEST2)
     {
-      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
+      SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
       Log->Append("EVENT_TEST2:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
     }
     else if (event_id == PROTOCOL_DISCONNECTED)
     {
       String name = (char *)event_data;
-      Log->Append("MQTT disconnected: ").Append(name).Internal();
+      Log->Append("Protocol disconnected: ").Append(name).Internal();
     }
     else if (event_id == PROTOCOL_MESSAGE)
     {
-      SigmaMQTTPkg pkg = SigmaMQTTPkg((char *)event_data);
-      Log->Append("SIGMAMQTT_MESSAGE:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
+      SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
+      Log->Append("SIGMA_TRANSFER_MESSAGE:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
     }
 
     else
@@ -83,7 +83,7 @@ void setup() {
   delay(100);
   
 
-  espErr = esp_event_handler_instance_register(SIGMAMQTT_EVENT,
+  espErr = esp_event_handler_instance_register(SIGMATRANSFER_EVENT,
                                             ESP_EVENT_ANY_ID,
                                             protocolEventHandler,
                                             NULL,
@@ -97,16 +97,18 @@ void setup() {
   // init protocols
   Transfer = new SigmaTransfer("Sigma", "kybwynyd");
   // Add MQTT
-  MqttConfig mqttConfig;
-  mqttConfig.server = "192.168.0.102";
+  UartConfig uartConfig;
+  uartConfig.txPin = 1;
+  uartConfig.rxPin = 2;
+  uartConfig.baudRate = 9600;
   
-  SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
-  Transfer->AddProtocol("MQTT", Mqtt);
+  SigmaProtocol *Uart = new SigmaUART(uartConfig);
+  Transfer->AddProtocol("UART", Uart);
   
 // Add Channels
   SigmaChannelConfig channelConfig1;
   channelConfig1.name = "Channel_1";
-  channelConfig1.protocol = Mqtt;
+  channelConfig1.protocol = Uart;
   channelConfig1.rootTopic = "test/test1/";
   channelConfig1.crypt = NULL;
 
@@ -116,7 +118,7 @@ void setup() {
 
   SigmaChannelConfig channelConfig2;
   channelConfig2.name = "Channel_2";
-  channelConfig2.protocol = Mqtt;
+  channelConfig2.protocol = Uart;
   channelConfig2.rootTopic = "test/test2/";
   channelConfig2.crypt = NULL;
 

@@ -5,6 +5,8 @@
 #include "SigmaProtocol.h"
 #include "SigmaLoger.h"
 #include "SigmaChannel.h"
+#include <esp_event.h>
+
 
 class SigmaTransfer
 {

@@ -32,9 +32,12 @@ public:
     virtual bool FinalizeSetup() = 0;
     virtual String GetName()=0;
     virtual void SetName(String name)=0;
-
+    virtual void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
+    virtual bool GetShouldConnect() {return shouldConnect;};
+    
 protected:
     bool isWiFiRequired = false;
+    bool shouldConnect = true;
     
 private:
     

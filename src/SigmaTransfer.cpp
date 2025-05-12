@@ -2,8 +2,7 @@
 #include "SigmaProtocol.h"
 #include <WiFi.h>
 
-ESP_EVENT_DEFINE_BASE(SIGMAMQTT_EVENT);
-
+ESP_EVENT_DEFINE_BASE(SIGMATRANSFER_EVENT);
 
 SigmaTransfer::SigmaTransfer(String ssid, String password)
 {
@@ -79,7 +78,7 @@ bool SigmaTransfer::Begin()
         {
             PLogger->Append("Protocol: ").Append(p.first).Append(" failed to finalize setup").Error();
         }
-    }   
+    }
     return true;
 }
 
@@ -95,7 +94,7 @@ void SigmaTransfer::StopWiFi()
 void SigmaTransfer::StartWiFi()
 {
     PLogger->Append("Connecting to WiFi network: ").Append(ssid).Internal();
-        WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
+    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         //PLogger->Append("WiFi event: ").Append(event).Internal();
         switch (event)
@@ -107,7 +106,9 @@ void SigmaTransfer::StartWiFi()
             for (auto &p : protocols)
             {
                 if (p.second->IsWiFiRequired()) {
+                    if (p.second->GetShouldConnect()) {
                     p.second->Connect();
+                    }
                 }
             }
             break;

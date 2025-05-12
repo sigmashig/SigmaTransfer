@@ -3,7 +3,7 @@
 #include <WiFi.h>
 
 //ESP_EVENT_DEFINE_BASE(SIGMAMQTT_EVENT);
-
+ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
 
 SigmaMQTT::SigmaMQTT(MqttConfig config)
@@ -15,9 +15,6 @@ SigmaMQTT::SigmaMQTT(MqttConfig config)
     // mqttClient.onUnsubscribe(onMqttUnsubscribe);
     mqttClient.onMessage(onMqttMessage);
     // mqttClient.onPublish(onMqttPublish);
-
-    mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(ConnectToMqtt));
-    // MLogger->Internal("MAP CLEAR");
     eventMap.clear();
 }
 
@@ -42,12 +39,10 @@ void SigmaMQTT::SetParams(MqttConfig config)
     {
         IPAddress ip;
         ip.fromString(config.server);
-        //MLogger->Append("IP: ").Append(ip.toString()).Internal();
         mqttClient.setServer(ip, config.port);
     }
     else
     {
-        //MLogger->Append("URL: ").Append(config.server).Internal();
         mqttClient.setServer(config.server.c_str(), config.port);
     }
     if (config.clientId == "") {
@@ -128,9 +123,9 @@ void SigmaMQTT::Connect()
 void SigmaMQTT::Disconnect()
 {
     MLogger->Append("Disconnecting from MQTT").Info();
-    if (mqttReconnectTimer != NULL) {
-        xTimerStart(mqttReconnectTimer, 0);
-    }
+    //if (mqttReconnectTimer != NULL) {
+    //    xTimerStart(mqttReconnectTimer, 0);
+    //}
     mqttClient.disconnect();
 }
 bool SigmaMQTT::IsConnected()
@@ -140,7 +135,7 @@ bool SigmaMQTT::IsConnected()
 void SigmaMQTT::onMqttConnect(bool sessionPresent)
 {
     MLogger->Append("Posting connected event for ").Append(name).Internal();
-    esp_err_t res = esp_event_post(SIGMAMQTT_EVENT, PROTOCOL_CONNECTED, (void*) (name.c_str()), name.length()+1, portMAX_DELAY);
+    esp_err_t res = esp_event_post(SIGMATRANSFER_EVENT, PROTOCOL_CONNECTED, (void*) (name.c_str()), name.length()+1, portMAX_DELAY);
     for (auto const &x : eventMap)
     {
         // MLogger->Append("Subscribing to ").Append(x.first).Internal();
@@ -177,26 +172,26 @@ void SigmaMQTT::onMqttMessage(char *topic, char *payload, AsyncMqttClientMessage
     }
     if (isReady)
     {
-        SigmaMQTTPkg pkg(sTopic, sPayload);
+        SigmaInternalPkg pkg(sTopic, sPayload);
         for (auto const &x : eventMap)
         {
             if (sTopic == x.first)
             {
                 int32_t e = (x.second.eventId == 0 ? PROTOCOL_MESSAGE : x.second.eventId);
-                esp_err_t res = esp_event_post(SIGMAMQTT_EVENT, e, pkg.GetMsg(), strlen(pkg.GetMsg()) + 1, portMAX_DELAY);
+                esp_err_t res = esp_event_post(SIGMATRANSFER_EVENT, e, pkg.GetMsg(), strlen(pkg.GetMsg()) + 1, portMAX_DELAY);
                 return;
             }
         }
-        esp_event_post(SIGMAMQTT_EVENT, PROTOCOL_MESSAGE, (void *)(pkg.GetMsg()), len, portMAX_DELAY);
+        esp_event_post(SIGMATRANSFER_EVENT, PROTOCOL_MESSAGE, (void *)(pkg.GetMsg()), len, portMAX_DELAY);
     }
 }
 
 void SigmaMQTT::onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
     MLogger->Internal("Disconnected from MQTT");
-    esp_err_t res = esp_event_post(SIGMAMQTT_EVENT, PROTOCOL_DISCONNECTED, NULL, 0, portMAX_DELAY);
-    if (WiFi.isConnected())
-    {
-        xTimerStart(mqttReconnectTimer, 0);
-    }
+    esp_err_t res = esp_event_post(SIGMATRANSFER_EVENT, PROTOCOL_DISCONNECTED, NULL, 0, portMAX_DELAY);
+    //if (WiFi.isConnected())
+    //{
+    //    xTimerStart(mqttReconnectTimer, 0);
+    //}
 }

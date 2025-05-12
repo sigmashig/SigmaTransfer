@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <AsyncMqttClient.h>
 #include <SigmaLoger.h>
-#include <SigmaMQTTPkg.h>
+#include <SigmaInternalPkg.h>
 #include <map>
 #include <esp_event.h>
 #include "SigmaProtocolDefs.h"
@@ -21,7 +21,6 @@ typedef struct {
 } MqttConfig;
 
 
-ESP_EVENT_DECLARE_BASE(SIGMAMQTT_EVENT);
 
 class SigmaMQTT : public SigmaProtocol
 {
@@ -60,7 +59,7 @@ private:
     static void ConnectToMqtt();
 
     inline static String name;
-    inline static TimerHandle_t mqttReconnectTimer;
+    //inline static TimerHandle_t mqttReconnectTimer;
     inline static String clientId;
     inline static AsyncMqttClient mqttClient;
     static void onMqttConnect(bool sessionPresent);
