@@ -11,24 +11,25 @@
 class SigmaTransfer
 {
 public:
-    SigmaTransfer(String ssid="", String password="");
+    SigmaTransfer(const esp_event_loop_handle_t eventLoop, String ssid="", String password="");
     ~SigmaTransfer();
     bool AddProtocol(String name, SigmaProtocol *protocol);
-    bool AddChannel(SigmaChannel *channel);
+    //bool AddChannel(SigmaChannel *channel);
     bool Begin();
     void StopWiFi();
     void StartWiFi();
+    SigmaProtocol *GetProtocol(String name);
 
 
 private:
-    SigmaLoger *PLogger = new SigmaLoger(512);
+    SigmaLoger *TLogger = new SigmaLoger(512);
     inline static String ssid = "";
     inline static String wifiPassword = "";
     bool isWiFiStopped = false;
     TimerHandle_t wifiReconnectTimer;
-
+    const esp_event_loop_handle_t eventLoop;
     std::map<String, SigmaProtocol *> protocols;
-    std::map<String, SigmaChannel *> channels;
+    //std::map<String, SigmaChannel *> channels;
 
     bool isWiFiRequired();
     static void ConnectToWifi();

@@ -1,3 +1,4 @@
+/*
 #include "SigmaChannel.h"
 
 SigmaChannel::SigmaChannel(SigmaChannelConfig config)
@@ -9,3 +10,4 @@ SigmaChannel::~SigmaChannel()
 {
 
 }
+*/

@@ -1,3 +1,4 @@
+/*
 #ifndef SIGMACHANNEL_H
 #define SIGMACHANNEL_H
 #pragma once
@@ -14,7 +15,8 @@ typedef struct
     SigmaProtocol *protocol;
     SigmaCrypt *crypt = NULL;
     int eventId = PROTOCOL_MESSAGE;
-    bool isReSubscribe = true;
+    //bool isReSubscribe = true;
+    byte priority = 128;
 } SigmaChannelConfig;
 
 class SigmaChannel
@@ -25,13 +27,15 @@ public:
     void Subscribe(TopicSubscription subscription) { config.protocol->Subscribe(subscription, config.rootTopic); }  ;
     void Send(String topic, String payload) { config.protocol->Publish(config.rootTopic + topic, payload); };
     void Unsubscribe(String topic) { config.protocol->Unsubscribe(config.rootTopic + topic); };
+    void SetCorrespondentId(String correspondentId) { config.correspondentId = correspondentId; };
     void SetProtocol(SigmaProtocol *protocol) { config.protocol = protocol; };
     void SetCrypt(SigmaCrypt *crypt) { config.crypt = crypt; };
     void SetEventId(int eventId) { config.eventId = eventId; };
-    void SetIsReSubscribe(bool isReSubscribe) { config.isReSubscribe = isReSubscribe; };
     SigmaChannelConfig GetConfig() { return config; };
+    String GetName() { return config.name; };
 private:
     SigmaChannelConfig config;
 };
 
 #endif
+*/

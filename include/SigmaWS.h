@@ -1,5 +1,5 @@
-#ifndef SIGMAUART_H
-#define SIGMAUART_H
+#ifndef SIGMAWS_H
+#define SIGMAWS_H
 
 #pragma once
 #include <Arduino.h>
@@ -9,27 +9,27 @@
 #include <esp_event.h>
 #include "SigmaProtocolDefs.h"
 #include "SigmaProtocol.h"
-#include <HardwareSerial.h>
-//#include <driver/uart.h>
+#include <AsyncTCP.h>
 
 typedef struct {
-    byte uartNum;
-    uint txPin;
-    uint rxPin;
-    ulong baudRate;
-    SerialConfig portConfig = SERIAL_8N1;
-} UartConfig;
+    String host;
+    uint16_t port=80;
+    String clientId;
+    String rootTopic = "/";
+    String apiKey = "";
+    bool isPlain = false;
+} WSConfig;
 
 
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
-class SigmaUART : public SigmaProtocol
+class SigmaWS : public SigmaProtocol
 {
 public:
-    SigmaUART(UartConfig config);
-    SigmaUART();
+    SigmaWS(WSConfig config);
+    SigmaWS();
 
-    void SetParams(UartConfig config);
+    void SetParams(WSConfig config);
     bool BeginSetup();
     bool FinalizeSetup();
     void Subscribe(TopicSubscription subscriptionTopic, String rootTopic = "");
@@ -43,26 +43,22 @@ public:
     void Unsubscribe(String topic, String rootTopic = "");
     void Unsubscribe(TopicSubscription topic, String rootTopic = "") { Unsubscribe(topic.topic, rootTopic); };
 
-    //void SetClientId(String id) { clientId= id; };
     void Connect();
     void Disconnect();
     bool IsReady() { return isConnected; };
-    bool IsNetRequired() { return false; };
+    bool IsNetRequired() { return true; };
     String GetName() { return name; };
     void SetName(String name) { Serial.printf("SetName=%s\n",name.c_str()); this->name = name; };
 private:
 
-    UartConfig config;
-    //inline static SigmaLoger *MLogger = new SigmaLoger(512);
+    WSConfig config;
     bool isConnected = false;
-    static void onReceiveMsg();
-    static void onReceiveError(hardwareSerial_error_t error);
 
     inline static String name;
     inline static String clientId;
     inline static std::map<String, TopicSubscription> eventMap;
 
-    inline static HardwareSerial *serial;
+    inline static AsyncClient *client;
 };
 
 #endif

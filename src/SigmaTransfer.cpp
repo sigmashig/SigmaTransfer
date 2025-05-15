@@ -4,7 +4,7 @@
 
 ESP_EVENT_DEFINE_BASE(SIGMATRANSFER_EVENT);
 
-SigmaTransfer::SigmaTransfer(String ssid, String password)
+SigmaTransfer::SigmaTransfer(esp_event_loop_handle_t eventLoop, String ssid, String password) : eventLoop(eventLoop)
 {
     this->ssid = ssid;
     this->wifiPassword = password;
@@ -17,23 +17,29 @@ SigmaTransfer::~SigmaTransfer()
 
 bool SigmaTransfer::AddProtocol(String name, SigmaProtocol *protocol)
 {
+    TLogger->Append("Adding protocol: ").Append(name).Internal();
     protocol->SetName(name);
+    protocol->SetLoop(eventLoop);
     protocols[name] = protocol;
     return true;
 }
 
+/*
 bool SigmaTransfer::AddChannel(SigmaChannel *channel)
 {
     channels[channel->GetConfig().correspondentId] = channel;
     return true;
 }
+*/
 
 bool SigmaTransfer::isWiFiRequired()
 {
     for (auto &p : protocols)
     {
-        if (p.second->IsWiFiRequired())
+        TLogger->Append("Checking protocol: ").Append(p.first).Internal();
+        if (p.second->IsNetworkRequired())
         {
+            TLogger->Append("Protocol: ").Append(p.first).Append(" requires network").Info();
             return true;
         }
     }
@@ -47,36 +53,36 @@ void SigmaTransfer::ConnectToWifi()
 
 bool SigmaTransfer::Begin()
 {
-    PLogger->Append("Starting").Info();
+    TLogger->Append("Starting").Info();
     if (isWiFiRequired())
     {
-        PLogger->Append("WiFi required").Info();
+        TLogger->Append("WiFi required").Info();
         StartWiFi();
-        PLogger->Append("Waiting for WiFi connection").Info();
+        TLogger->Append("Waiting for WiFi connection").Info();
         int res = WiFi.waitForConnectResult();
-        PLogger->Append("WiFi connection result: ").Append(res).Info();
+        TLogger->Append("WiFi connection result: ").Append(res).Info();
     }
     for (auto &p : protocols)
     {
-        PLogger->Append("Starting protocol: ").Append(p.first).Info();
+        TLogger->Append("Starting protocol: ").Append(p.first).Info();
         if (p.second->BeginSetup())
         {
-            PLogger->Append("Protocol: ").Append(p.first).Append(" connected").Info();
+            TLogger->Append("Protocol: ").Append(p.first).Append(" connected").Info();
         }
         else
         {
-            PLogger->Append("Protocol: ").Append(p.first).Append(" failed to connect").Error();
+            TLogger->Append("Protocol: ").Append(p.first).Append(" failed to connect").Error();
         }
     }
     for (auto &p : protocols)
     {
         if (p.second->FinalizeSetup())
         {
-            PLogger->Append("Protocol: ").Append(p.first).Append(" finalized setup").Info();
+            TLogger->Append("Protocol: ").Append(p.first).Append(" finalized setup").Info();
         }
         else
         {
-            PLogger->Append("Protocol: ").Append(p.first).Append(" failed to finalize setup").Error();
+            TLogger->Append("Protocol: ").Append(p.first).Append(" failed to finalize setup").Error();
         }
     }
     return true;
@@ -88,12 +94,12 @@ void SigmaTransfer::StopWiFi()
     xTimerStop(wifiReconnectTimer, portMAX_DELAY);
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
-    PLogger->Append("WiFi disconnected").Info();
+    TLogger->Append("WiFi disconnected").Info();
 }
 
 void SigmaTransfer::StartWiFi()
 {
-    PLogger->Append("Connecting to WiFi network: ").Append(ssid).Internal();
+    TLogger->Append("Connecting to WiFi network: ").Append(ssid).Internal();
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         //PLogger->Append("WiFi event: ").Append(event).Internal();
@@ -102,10 +108,10 @@ void SigmaTransfer::StartWiFi()
         case SYSTEM_EVENT_STA_GOT_IP:
         {
             xTimerStop(wifiReconnectTimer, portMAX_DELAY);
-            PLogger->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
+            TLogger->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
             for (auto &p : protocols)
             {
-                if (p.second->IsWiFiRequired()) {
+                if (p.second->IsNetworkRequired()) {
                     if (p.second->GetShouldConnect()) {
                     p.second->Connect();
                     }
@@ -115,11 +121,11 @@ void SigmaTransfer::StartWiFi()
         }
         case SYSTEM_EVENT_STA_DISCONNECTED:
         {
-            PLogger->Append("WiFi disconnected").Error();
-            PLogger->Append("WiFi connection error:").Append(info.wifi_sta_disconnected.reason).Error();
+            TLogger->Append("WiFi disconnected").Error();
+            TLogger->Append("WiFi connection error:").Append(info.wifi_sta_disconnected.reason).Error();
             for (auto &p : protocols)
             {
-                if (p.second->IsWiFiRequired()) {
+                if (p.second->IsNetworkRequired()) {
                     p.second->Disconnect();
                 }
             }
@@ -136,10 +142,15 @@ void SigmaTransfer::StartWiFi()
         }
         default:
         {
-            PLogger->Append("WiFi event: ").Append(event).Internal();
+            TLogger->Append("WiFi event: ").Append(event).Internal();
             break;
         }
         } });
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), wifiPassword.c_str());
+}
+
+SigmaProtocol *SigmaTransfer::GetProtocol(String name)
+{
+    return protocols[name];
 }

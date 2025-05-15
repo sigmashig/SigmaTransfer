@@ -2,27 +2,48 @@
 #include <SigmaTransfer.h>
 #include <SigmaUART.h>
 #include <SigmaChannel.h>
+#include <SigmaMQTT.h>
 
 SigmaTransfer *Transfer;
-SigmaChannel *Channel;
-SigmaChannel *Channel2;
+esp_event_loop_handle_t SigmaTransfer_event_loop = nullptr;
+#define PROTO_MQTT 1
 
-enum {
+enum
+{
   EVENT_TEST1 = 0x80,
   EVENT_TEST2 = 0x81,
   EVENT_TEST3 = 0x82,
   EVENT_TEST4 = 0x83,
   EVENT_TEST5 = 0x84
 } MY_EVENT_IDS;
-
-
-void TestMessaging()
+void TestDelayedMessaging(String name)
 {
-    Serial.println("Sending message");
+  SigmaProtocol *protocol = Transfer->GetProtocol(name);
+  if (protocol != NULL)
+  {
+    protocol->Sent("delayedTopic1", "Hello, World!");
+  }
+}
 
-  Channel->Send("t3","Hello, World!");
-  Channel2->Send("t4","Hello, World!");
 
+void TestMessaging(String name)
+{
+  SigmaProtocol *protocol = Transfer->GetProtocol(name);
+  if (protocol != NULL)
+  {
+    TopicSubscription subscription;
+    subscription.topic = "subscriptionTopic1";
+    subscription.eventId = EVENT_TEST1;
+    subscription.isReSubscribe = true;
+    protocol->Subscribe(subscription);
+    subscription.topic = "subscriptionTopic2";
+    subscription.eventId = EVENT_TEST2;
+    subscription.isReSubscribe = true;
+    protocol->Subscribe(subscription);
+
+    protocol->Sent("testTopic1", "Hello, World!");
+    protocol->Sent("testTopic2", "Hello, World!");
+  }
 }
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -36,7 +57,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
     {
       String name = (char *)event_data;
       Log->Append("Protocol connected: ").Append(name).Internal();
-      TestMessaging();
+      TestMessaging(name);
     }
     else if (event_id == EVENT_TEST1)
     {
@@ -66,37 +87,46 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
   }
 }
 
-
-
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   Serial.println("----Hello, World!-----");
   Log = new SigmaLoger(512);
   esp_err_t espErr = ESP_OK;
 
-  esp_event_loop_create_default();
-  if (espErr != ESP_OK && espErr != ESP_ERR_INVALID_STATE)
+  esp_event_loop_args_t loop_args = {
+      .queue_size = 100,
+      .task_name = "SigmaTransfer_event_loop",
+      .task_priority = 5,
+      .task_stack_size = 4096,
+      .task_core_id = 0};
+
+  espErr = esp_event_loop_create(&loop_args, &SigmaTransfer_event_loop);
+  if (espErr != ESP_OK)
   {
-    Log->Printf(F("Failed to create default event loop: %d"), espErr).Internal();
+    Log->Printf("Failed to create event loop: %d", espErr).Internal();
+    exit(1);
   }
 
   delay(100);
-  
 
-  espErr = esp_event_handler_instance_register(SIGMATRANSFER_EVENT,
-                                            ESP_EVENT_ANY_ID,
-                                            protocolEventHandler,
-                                            NULL,
-                                            NULL);
+  espErr = esp_event_handler_instance_register_with(
+      SigmaTransfer_event_loop,
+      SIGMATRANSFER_EVENT,
+      ESP_EVENT_ANY_ID,
+      protocolEventHandler,
+      NULL,
+      NULL);
   if (espErr != ESP_OK)
   {
     Log->Printf("Failed to register event handler: %d", espErr).Internal();
+    exit(1);
   }
 
-
   // init protocols
-  Transfer = new SigmaTransfer("Sigma", "kybwynyd");
-  // Add MQTT
+  Transfer = new SigmaTransfer( SigmaTransfer_event_loop, "Sigma", "kybwynyd");
+// Add MQTT
+#ifdef PROTO_UART
   UartConfig uartConfig;
   uartConfig.txPin = 1;
   uartConfig.rxPin = 2;
@@ -111,38 +141,38 @@ void setup() {
   channelConfig1.protocol = Uart;
   channelConfig1.rootTopic = "test/test1/";
   channelConfig1.crypt = NULL;
-
+  channelConfig1.priority = 100;
 
   Channel = new SigmaChannel(channelConfig1);
   Transfer->AddChannel(Channel);
+#endif
+#ifdef PROTO_MQTT
+  MqttConfig mqttConfig;
+  mqttConfig.server = "192.168.0.102";
+  mqttConfig.rootTopic="test/test1/";
+  mqttConfig.username="test";
+  mqttConfig.password="password";
 
-  SigmaChannelConfig channelConfig2;
-  channelConfig2.name = "Channel_2";
-  channelConfig2.protocol = Uart;
-  channelConfig2.rootTopic = "test/test2/";
-  channelConfig2.crypt = NULL;
+  SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
+  Transfer->AddProtocol("MQTT", Mqtt);
+/*
+  // Add Channels
+  SigmaChannelConfig channelConfig1;
+  channelConfig1.name = "Channel_1";
+  channelConfig1.protocol = Mqtt;
+  channelConfig1.rootTopic = "test/test1/";
+  channelConfig1.crypt = NULL;
 
-  Channel2 = new SigmaChannel(channelConfig2);
-  Transfer->AddChannel(Channel2);
+  SigmaChannel *MqttChannel = new SigmaChannel(channelConfig1);
+  Transfer->AddChannel(MqttChannel);
+*/
+#endif
+  // Start delayed messaging
+  #ifdef PROTO_MQTT
+    TestDelayedMessaging("MQTT");
+  #endif
 
-  // Subscribe to channel topics
-  TopicSubscription subscription;
-  subscription.topic = "t3";
-  subscription.eventId = EVENT_TEST1;
-  subscription.isReSubscribe = true;
-  Channel->Subscribe(subscription);
-
-  TopicSubscription subscription2;
-  subscription2.topic = "t4";
-  subscription2.eventId = EVENT_TEST2;
-  subscription2.isReSubscribe = true;
-  Channel2->Subscribe(subscription2);
-
-  // Start
-
-
-
-if (Transfer->Begin())
+  if (Transfer->Begin())
   {
     Serial.println("Transfer initialized");
   }
@@ -152,14 +182,12 @@ if (Transfer->Begin())
     exit(1);
   }
 
-// Init WiFi
-  
+  // Init WiFi
 
   // Send message
+}
 
-
-  }
-
-void loop() {
+void loop()
+{
   vTaskDelete(NULL);
 }

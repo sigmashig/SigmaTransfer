@@ -18,4 +18,11 @@ typedef struct
     bool isReSubscribe = true;
 } TopicSubscription;
 
+typedef struct
+{
+    String protocolName;
+    String topic;
+    String payload;
+} Message;
+
 #endif

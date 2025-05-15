@@ -14,10 +14,11 @@
 typedef struct {
     String server;
     uint16_t port=1883;
-    String topic;
+    String rootTopic;
     String username="";
     String password="";
     String clientId="Client_"+String(ESP.getEfuseMac(),HEX);
+    int keepAlive=60;
 } MqttConfig;
 
 
@@ -25,38 +26,35 @@ typedef struct {
 class SigmaMQTT : public SigmaProtocol
 {
 public:
-    //[[deprecated("Use a single parameter url instead")]] static void Init(IPAddress ip, String url = "", uint16_t port = 1883, String user = "", String pwd = "");
-    //SigmaMQTT(String url, uint16_t port = 1883, String user = "", String pwd = "", String clientId = "");
     SigmaMQTT(MqttConfig config);
     SigmaMQTT();
 
-    //void Init(String url, uint16_t port = 1883, String user = "", String pwd = "", String clientId = "");
     void SetParams(MqttConfig config);
     bool BeginSetup();
     bool FinalizeSetup();
-    void Subscribe(TopicSubscription subscriptionTopic, String rootTopic = "");
-    void Subscribe(String topic)
+    void Subscribe(TopicSubscription subscriptionTopic);
+    /*void Subscribe(String topic)
     {
         TopicSubscription pkg;
-        pkg.topic = topic;
+        pkg.topic = config.rootTopic + topic;
         Subscribe(pkg);
-    };
+    };*/
     void Publish(String topic, String payload);
-    void Unsubscribe(String topic, String rootTopic = "");
-    void Unsubscribe(TopicSubscription topic, String rootTopic = "") { Unsubscribe(topic.topic, rootTopic); };
+    void Unsubscribe(String topic);
+    //void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
     void SetClientId(String id) { clientId= id; };
     void Connect();
     void Disconnect();
-    bool IsConnected();
-    bool IsWiFiRequired() { return true; };
+    bool IsReady();
+    bool IsNetworkRequired() { return true; };
     String GetName() { return name; };
-    void SetName(String name) { Serial.printf("SetName=%s\n",name.c_str()); this->name = name; };
+    void SetName(String name) { this->name = name; };
 private:
 
     MqttConfig config;
     inline static SigmaLoger *MLogger = new SigmaLoger(512);
-    static void ConnectToMqtt();
+    //static void ConnectToMqtt();
 
     inline static String name;
     //inline static TimerHandle_t mqttReconnectTimer;

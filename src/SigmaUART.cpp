@@ -7,9 +7,9 @@
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
 
-SigmaUART::SigmaUART(UartConfig config)
+SigmaUART::SigmaUART(UartConfig _config)
 {
-    SetParams(config);
+    SetParams(_config);
     eventMap.clear();
     serial = new HardwareSerial(config.uartNum);
     serial->onReceive(onReceiveMsg);
@@ -64,12 +64,14 @@ void SigmaUART::Unsubscribe(String topic, String rootTopic)
 void SigmaUART::Connect()
 {
     serial->begin(config.baudRate,config.portConfig,config.rxPin,config.txPin);
+    esp_event_post(SIGMATRANSFER_EVENT, PROTOCOL_CONNECTED, (void*) (name.c_str()), name.length()+1, portMAX_DELAY);
     isConnected = true;
 }
 void SigmaUART::Disconnect()
 {
     serial->end();
     isConnected = false;
+    esp_event_post(SIGMATRANSFER_EVENT, PROTOCOL_DISCONNECTED, (void*) (name.c_str()), name.length()+1, portMAX_DELAY);
 }
 
 void SigmaUART::onReceiveMsg()
