@@ -32,7 +32,7 @@ public:
     void SetParams(UartConfig config);
     bool BeginSetup();
     bool FinalizeSetup();
-    void Subscribe(TopicSubscription subscriptionTopic, String rootTopic = "");
+    void Subscribe(TopicSubscription subscriptionTopic);
     void Subscribe(String topic)
     {
         TopicSubscription pkg;
@@ -40,8 +40,11 @@ public:
         Subscribe(pkg);
     };
     void Publish(String topic, String payload);
-    void Unsubscribe(String topic, String rootTopic = "");
-    void Unsubscribe(TopicSubscription topic, String rootTopic = "") { Unsubscribe(topic.topic, rootTopic); };
+    void Unsubscribe(String topic);
+    void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
+    void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
+    bool GetShouldConnect() { return shouldConnect; };
+    void Close() { shouldConnect = false; Disconnect(); };
 
     //void SetClientId(String id) { clientId= id; };
     void Connect();
@@ -63,6 +66,7 @@ private:
     inline static std::map<String, TopicSubscription> eventMap;
 
     inline static HardwareSerial *serial;
+    inline static bool shouldConnect = true;
 };
 
 #endif

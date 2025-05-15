@@ -7,6 +7,7 @@
 SigmaTransfer *Transfer;
 esp_event_loop_handle_t SigmaTransfer_event_loop = nullptr;
 #define PROTO_MQTT 1
+#define PROTO_UART 1
 
 enum
 {
@@ -126,7 +127,7 @@ void setup()
   // init protocols
   Transfer = new SigmaTransfer( SigmaTransfer_event_loop, "Sigma", "kybwynyd");
 // Add MQTT
-#ifdef PROTO_UART
+#if PROTO_UART==1
   UartConfig uartConfig;
   uartConfig.txPin = 1;
   uartConfig.rxPin = 2;
@@ -135,18 +136,8 @@ void setup()
   SigmaProtocol *Uart = new SigmaUART(uartConfig);
   Transfer->AddProtocol("UART", Uart);
   
-// Add Channels
-  SigmaChannelConfig channelConfig1;
-  channelConfig1.name = "Channel_1";
-  channelConfig1.protocol = Uart;
-  channelConfig1.rootTopic = "test/test1/";
-  channelConfig1.crypt = NULL;
-  channelConfig1.priority = 100;
-
-  Channel = new SigmaChannel(channelConfig1);
-  Transfer->AddChannel(Channel);
 #endif
-#ifdef PROTO_MQTT
+#if PROTO_MQTT==1
   MqttConfig mqttConfig;
   mqttConfig.server = "192.168.0.102";
   mqttConfig.rootTopic="test/test1/";
@@ -155,17 +146,6 @@ void setup()
 
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
   Transfer->AddProtocol("MQTT", Mqtt);
-/*
-  // Add Channels
-  SigmaChannelConfig channelConfig1;
-  channelConfig1.name = "Channel_1";
-  channelConfig1.protocol = Mqtt;
-  channelConfig1.rootTopic = "test/test1/";
-  channelConfig1.crypt = NULL;
-
-  SigmaChannel *MqttChannel = new SigmaChannel(channelConfig1);
-  Transfer->AddChannel(MqttChannel);
-*/
 #endif
   // Start delayed messaging
   #ifdef PROTO_MQTT

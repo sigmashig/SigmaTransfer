@@ -38,12 +38,8 @@ bool SigmaUART::FinalizeSetup()
 
 
 
-void SigmaUART::Subscribe(TopicSubscription subscriptionTopic, String rootTopic)
+void SigmaUART::Subscribe(TopicSubscription subscriptionTopic)
 {
-    if (rootTopic != "")
-    {
-        subscriptionTopic.topic = rootTopic + subscriptionTopic.topic;
-    }
     eventMap[subscriptionTopic.topic] = subscriptionTopic;
 }
 
@@ -53,12 +49,8 @@ void SigmaUART::Publish(String topic, String payload)
     serial->write(pkg.GetMsg(),pkg.GetMsgLength());
 }
 
-void SigmaUART::Unsubscribe(String topic, String rootTopic)
+void SigmaUART::Unsubscribe(String topic)
 {
-    if (rootTopic != "")
-    {
-        topic = rootTopic + topic;
-    }
     eventMap.erase(topic);
 }
 void SigmaUART::Connect()
