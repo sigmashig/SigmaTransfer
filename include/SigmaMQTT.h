@@ -50,6 +50,9 @@ public:
     bool IsNetworkRequired() { return true; };
     String GetName() { return name; };
     void SetName(String name) { this->name = name; };
+    void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
+    bool GetShouldConnect() { return shouldConnect; };
+    void Close() { shouldConnect = false; Disconnect(); };
 private:
 
     MqttConfig config;
@@ -57,7 +60,7 @@ private:
     //static void ConnectToMqtt();
 
     inline static String name;
-    //inline static TimerHandle_t mqttReconnectTimer;
+    inline static TimerHandle_t mqttReconnectTimer;
     inline static String clientId;
     inline static AsyncMqttClient mqttClient;
     static void onMqttConnect(bool sessionPresent);
@@ -66,6 +69,7 @@ private:
 
     inline static std::map<String, TopicSubscription> eventMap;
     inline static std::map<String, String> topicMsg;
+    inline static bool shouldConnect = true;
 };
 
 #endif

@@ -28,13 +28,13 @@ public:
     virtual void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
     virtual void Disconnect() = 0;
-    virtual void Close() {  shouldConnect = false; Disconnect(); };
+    virtual void Close() =0;
     virtual void Connect() = 0;
     virtual bool IsReady() = 0;
     virtual String GetName()=0;
     virtual void SetName(String name)=0;
-    virtual void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
-    virtual bool GetShouldConnect() {return shouldConnect;};
+    virtual void SetShouldConnect(bool shouldConnect) =0;
+    virtual bool GetShouldConnect() =0;
     virtual void SetLoop(const esp_event_loop_handle_t eventLoop) { this->eventLoop = eventLoop; };
     virtual bool IsNetworkRequired() { return isNetworkRequired; };
     virtual bool BeginSetup() = 0;
@@ -42,7 +42,6 @@ public:
 protected:
     SigmaLoger *PLogger = new SigmaLoger(512);
     bool isNetworkRequired = false;
-    bool shouldConnect = true;
     String rootTopic = "/";
     inline static std::list<Message> messages;
     virtual void Publish(String topic, String payload) = 0;
