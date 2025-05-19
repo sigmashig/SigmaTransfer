@@ -33,15 +33,8 @@ public:
     bool BeginSetup();
     bool FinalizeSetup();
     void Subscribe(TopicSubscription subscriptionTopic);
-    /*void Subscribe(String topic)
-    {
-        TopicSubscription pkg;
-        pkg.topic = config.rootTopic + topic;
-        Subscribe(pkg);
-    };*/
     void Publish(String topic, String payload);
     void Unsubscribe(String topic);
-    //void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
     void SetClientId(String id) { clientId= id; };
     void Connect();
@@ -57,7 +50,6 @@ private:
 
     MqttConfig config;
     inline static SigmaLoger *MLogger = new SigmaLoger(512);
-    //static void ConnectToMqtt();
 
     inline static String name;
     inline static TimerHandle_t mqttReconnectTimer;

@@ -4,7 +4,7 @@
 
 ESP_EVENT_DEFINE_BASE(SIGMATRANSFER_EVENT);
 
-SigmaTransfer::SigmaTransfer(esp_event_loop_handle_t eventLoop, String ssid, String password) : eventLoop(eventLoop)
+SigmaTransfer::SigmaTransfer(String ssid, String password) 
 {
     this->ssid = ssid;
     this->wifiPassword = password;
@@ -19,7 +19,6 @@ bool SigmaTransfer::AddProtocol(String name, SigmaProtocol *protocol)
 {
     TLogger->Append("Adding protocol: ").Append(name).Internal();
     protocol->SetName(name);
-    protocol->SetLoop(eventLoop);
     protocols[name] = protocol;
     return true;
 }

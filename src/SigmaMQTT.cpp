@@ -2,7 +2,6 @@
 #include <esp_event.h>
 #include <WiFi.h>
 
-// ESP_EVENT_DEFINE_BASE(SIGMAMQTT_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
 SigmaMQTT::SigmaMQTT(MqttConfig config)
@@ -25,20 +24,8 @@ void SigmaMQTT::SetParams(MqttConfig _config)
 {
     this->config = _config;
     rootTopic = config.rootTopic;
-    bool isIp = true;
-    for (int i = 0; i < config.server.length(); i++)
-    {
-        if (config.server[i] == '.' || (config.server[i] >= '0' && config.server[i] <= '9'))
-        {
-            continue;
-        }
-        else
-        {
-            isIp = false;
-            break;
-        }
-    }
-
+    bool isIp = SigmaProtocol::IsIP(config.server);
+ 
     if (isIp)
     {
         IPAddress ip;

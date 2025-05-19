@@ -11,7 +11,7 @@
 class SigmaProtocol
 {
 public:
-    SigmaProtocol();
+    SigmaProtocol(String loopName);
     ~SigmaProtocol();
     virtual void Subscribe(TopicSubscription subscriptionTopic) = 0;
     virtual void Subscribe(String topic)
@@ -22,36 +22,41 @@ public:
         pkg.isReSubscribe = true;
         Subscribe(pkg);
     };
-
-    void Sent(String topic, String payload);
+    virtual void Send(String topic, String payload);
+    virtual void Send(String topic, byte *data, size_t size);
+    virtual void Send(String payload);
+    virtual void Send(byte *data, size_t size);
     virtual void Unsubscribe(String topic) = 0;
     virtual void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
     virtual void Disconnect() = 0;
-    virtual void Close() =0;
+    virtual void Close() = 0;
     virtual void Connect() = 0;
     virtual bool IsReady() = 0;
-    virtual String GetName()=0;
-    virtual void SetName(String name)=0;
-    virtual void SetShouldConnect(bool shouldConnect) =0;
-    virtual bool GetShouldConnect() =0;
-    virtual void SetLoop(const esp_event_loop_handle_t eventLoop) { this->eventLoop = eventLoop; };
+    virtual String GetName() = 0;
+    virtual void SetName(String name) = 0;
+    virtual void SetShouldConnect(bool shouldConnect) = 0;
+    virtual bool GetShouldConnect() = 0;
     virtual bool IsNetworkRequired() { return isNetworkRequired; };
     virtual bool BeginSetup() = 0;
     virtual bool FinalizeSetup() = 0;
+    static bool IsIP(String URL);
+    esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
+
 protected:
+    esp_event_loop_handle_t eventLoop;
+
     SigmaLoger *PLogger = new SigmaLoger(512);
     bool isNetworkRequired = false;
     String rootTopic = "/";
     inline static std::list<Message> messages;
     virtual void Publish(String topic, String payload) = 0;
-    static esp_err_t PostEvent(int32_t event_id, void *event_data,size_t size);
+    virtual void SendBinary(byte *data, size_t size) = 0;
+    esp_err_t PostEvent(int32_t event_id, void *event_data, size_t size);
     inline static SemaphoreHandle_t queueMutex = nullptr;
-    inline static esp_event_loop_handle_t eventLoop=nullptr;
-   
-private:
-    
+ //   inline static esp_event_loop_handle_t eventLoop = nullptr;
 
+private:
 };
 
 #endif

@@ -6,9 +6,9 @@
 
 SigmaTransfer *Transfer;
 esp_event_loop_handle_t SigmaTransfer_event_loop = nullptr;
-#define PROTO_MQTT 1
-#define PROTO_UART 1
-
+#define PROTO_MQTT 0
+#define PROTO_UART 0
+#define PROTO_WS 1
 enum
 {
   EVENT_TEST1 = 0x80,
@@ -22,10 +22,9 @@ void TestDelayedMessaging(String name)
   SigmaProtocol *protocol = Transfer->GetProtocol(name);
   if (protocol != NULL)
   {
-    protocol->Sent("delayedTopic1", "Hello, World!");
+    protocol->Send("delayedTopic1", "Hello, World!");
   }
 }
-
 
 void TestMessaging(String name)
 {
@@ -42,8 +41,8 @@ void TestMessaging(String name)
     subscription.isReSubscribe = true;
     protocol->Subscribe(subscription);
 
-    protocol->Sent("testTopic1", "Hello, World!");
-    protocol->Sent("testTopic2", "Hello, World!");
+    protocol->Send("testTopic1", "Hello, World!");
+    protocol->Send("testTopic2", "Hello, World!");
   }
 }
 
@@ -94,63 +93,72 @@ void setup()
   Serial.println("----Hello, World!-----");
   Log = new SigmaLoger(512);
   esp_err_t espErr = ESP_OK;
+  /*
+    esp_event_loop_args_t loop_args = {
+        .queue_size = 100,
+        .task_name = "SigmaTransfer_event_loop",
+        .task_priority = 5,
+        .task_stack_size = 4096,
+        .task_core_id = 0};
 
-  esp_event_loop_args_t loop_args = {
-      .queue_size = 100,
-      .task_name = "SigmaTransfer_event_loop",
-      .task_priority = 5,
-      .task_stack_size = 4096,
-      .task_core_id = 0};
+    espErr = esp_event_loop_create(&loop_args, &SigmaTransfer_event_loop);
+    if (espErr != ESP_OK)
+    {
+      Log->Printf("Failed to create event loop: %d", espErr).Internal();
+      exit(1);
+    }
+  */
+}
 
-  espErr = esp_event_loop_create(&loop_args, &SigmaTransfer_event_loop);
-  if (espErr != ESP_OK)
-  {
-    Log->Printf("Failed to create event loop: %d", espErr).Internal();
-    exit(1);
-  }
+// init protocols
+Transfer = new SigmaTransfer("Sigma", "kybwynyd");
 
-  delay(100);
+#if PROTO_WS == 1
+UartConfig uartConfig;
+uartConfig.txPin = 1;
+uartConfig.rxPin = 2;
+uartConfig.baudRate = 9600;
 
-  espErr = esp_event_handler_instance_register_with(
-      SigmaTransfer_event_loop,
-      SIGMATRANSFER_EVENT,
-      ESP_EVENT_ANY_ID,
-      protocolEventHandler,
-      NULL,
-      NULL);
-  if (espErr != ESP_OK)
-  {
-    Log->Printf("Failed to register event handler: %d", espErr).Internal();
-    exit(1);
-  }
+SigmaProtocol *Uart = new SigmaUART(uartConfig);
+Transfer->AddProtocol("UART", Uart);
+espErr = esp_event_handler_instance_register_with(
+    SigmaTransfer_event_loop,
+    SIGMATRANSFER_EVENT,
+    ESP_EVENT_ANY_ID,
+    protocolEventHandler,
+    NULL,
+    NULL);
+if (espErr != ESP_OK)
+{
+  Log->Printf("Failed to register event handler: %d", espErr).Internal();
+  exit(1);
 
-  // init protocols
-  Transfer = new SigmaTransfer( SigmaTransfer_event_loop, "Sigma", "kybwynyd");
-// Add MQTT
-#if PROTO_UART==1
+#endif
+
+#if PROTO_UART == 1
   UartConfig uartConfig;
   uartConfig.txPin = 1;
   uartConfig.rxPin = 2;
   uartConfig.baudRate = 9600;
-  
+
   SigmaProtocol *Uart = new SigmaUART(uartConfig);
   Transfer->AddProtocol("UART", Uart);
-  
+
 #endif
-#if PROTO_MQTT==1
+#if PROTO_MQTT == 1
   MqttConfig mqttConfig;
   mqttConfig.server = "192.168.0.102";
-  mqttConfig.rootTopic="test/test1/";
-  mqttConfig.username="test";
-  mqttConfig.password="password";
+  mqttConfig.rootTopic = "test/test1/";
+  mqttConfig.username = "test";
+  mqttConfig.password = "password";
 
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
   Transfer->AddProtocol("MQTT", Mqtt);
 #endif
   // Start delayed messaging
-  #ifdef PROTO_MQTT
-    TestDelayedMessaging("MQTT");
-  #endif
+#ifdef PROTO_MQTT
+  TestDelayedMessaging("MQTT");
+#endif
 
   if (Transfer->Begin())
   {

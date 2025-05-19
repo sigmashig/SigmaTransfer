@@ -9,20 +9,40 @@
 
 class SigmaInternalPkg
 {
+    // This class is used to send internal messages to the Sigma protocol.
+    // format:
+    // {protocol:"name of the protocol", "topic":"the topic", "isBinary":"true or false", "payload":"the payload", "length":"length of the payload"}
 public:
-    SigmaInternalPkg(String topic, String payload);
+    // prepare for serialize
+    SigmaInternalPkg(String protocol, String topic, String payload);
+    SigmaInternalPkg(String protocol, String topic, byte *binaryPayload, int binaryPayloadLength);
+
+    // prepare for deserialize
+    // msg is the message received from the Sigma protocol JSON format
     SigmaInternalPkg(const char *msg);
-    SigmaInternalPkg(String msg) : SigmaInternalPkg(msg.c_str()) {};
+    SigmaInternalPkg(const String &msg) : SigmaInternalPkg(msg.c_str()){};
+
     ~SigmaInternalPkg();
-    String GetTopic(){return topic;};
-    String GetPayload(){return payload;};
-    char *GetMsg(){return msg;};
-    int GetMsgLength(){return msgLength;};
+
+    String GetTopic() { return topic; };
+    String GetPayload() { return payload; };
+    String GetProtocol() { return protocol; };
+    String GetPkgString() { return pkgString; };
+    int GetBinaryPayloadLength() { return binaryPayloadLength; };
+    byte *GetBinaryPayload() { return binaryPayload; };
+    bool IsError() { return isError; };
 private:
+    String protocol;
     String topic;
     String payload;
-    char *msg;
-    int msgLength;
+    bool isBinary = false;
+    int length;
+    byte *binaryPayload = nullptr;
+    int binaryPayloadLength;
+    String pkgString;
+
+    bool isAllocated = false;
+    bool isError = false;
 };
 
 #endif
