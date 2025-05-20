@@ -1,11 +1,11 @@
-#include "SigmaWS.h"
+#include "SigmaWsClient.h"
 #include <ArduinoJson.h>
 #include <libb64/cencode.h>
 
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 
-SigmaWS::SigmaWS(String name, WSConfig _config)
+SigmaWsClient::SigmaWsClient(String name, WSConfig _config)
 {
     config = _config;
     this->name = name;
@@ -23,25 +23,25 @@ SigmaWS::SigmaWS(String name, WSConfig _config)
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
 }
 
-SigmaWS::SigmaWS()
+SigmaWsClient::SigmaWsClient()
 {
 }
 
-void SigmaWS::Subscribe(TopicSubscription subscriptionTopic)
+void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
 {
     addSubscription(subscriptionTopic);
     // Nothing todo here
 }
 
-void SigmaWS::Unsubscribe(String topic)
+void SigmaWsClient::Unsubscribe(String topic)
 {
     removeSubscription(topic);
     // Nothing todo here
 }
 
-void SigmaWS::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     if (event_id == PROTOCOL_SEND_RAW_BINARY_MESSAGE)
     {
         BinaryData *data = (BinaryData *)event_data;
@@ -64,11 +64,16 @@ void SigmaWS::protocolEventHandler(void *arg, esp_event_base_t event_base, int32
         String *payload = (String *)event_data;
         ws->sendWebSocketPingFrame(*payload);
     }
+    else if (event_id == PROTOCOL_SEND_PONG)
+    {
+        String *payload = (String *)event_data;
+        ws->sendWebSocketPongFrame(*payload);
+    }
 }
 
-void SigmaWS::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     if (event_id == PROTOCOL_STA_CONNECTED)
     {
         ws->Connect();
@@ -79,7 +84,7 @@ void SigmaWS::networkEventHandler(void *arg, esp_event_base_t event_base, int32_
     }
 }
 
-void SigmaWS::Connect()
+void SigmaWsClient::Connect()
 {
     PLogger->Internal("WS connecting");
     if (!SigmaAsyncNetwork::IsConnected())
@@ -95,15 +100,16 @@ void SigmaWS::Connect()
     wsClient.connect(url.c_str(), config.port);
 }
 
-void SigmaWS::Disconnect()
+void SigmaWsClient::Disconnect()
 {
+    sendWebSocketCloseFrame();
     wsClient.close();
     Connect();
 }
 
-void SigmaWS::onConnect(void *arg, AsyncClient *c)
+void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     ws->PLogger->Internal("TCP connected");
 
     // Generate WebSocket key - random 16 bytes base64 encoded
@@ -124,9 +130,7 @@ void SigmaWS::onConnect(void *arg, AsyncClient *c)
 
     // Create HTTP upgrade request
     String handshake = "GET ";
-    // handshake += ws->config.rootTopic;
-    handshake += "/";
-    // handshake += "\r\n";
+    handshake += ws->config.rootPath;
     handshake += " HTTP/1.1\r\n";
     handshake += "Host: ";
     handshake += ws->config.host;
@@ -172,22 +176,22 @@ void SigmaWS::onConnect(void *arg, AsyncClient *c)
     }
 }
 
-void SigmaWS::setReady(bool ready)
+void SigmaWsClient::setReady(bool ready)
 {
     isReady = ready;
     PLogger->Append("Setting ready to ").Append(ready).Internal();
     esp_event_post_to(SigmaProtocol::GetEventLoop(), GetName().c_str(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
 }
 
-void SigmaWS::onDisconnect(void *arg, AsyncClient *c)
+void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     ws->setReady(false);
 }
 
-void SigmaWS::onData(void *arg, AsyncClient *c, void *data, size_t len)
+void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     char *buf = (char *)data;
     String response = String(buf, len);
     ws->PLogger->Append("Received data from WebSocket server").Internal();
@@ -377,44 +381,49 @@ void SigmaWS::onData(void *arg, AsyncClient *c, void *data, size_t len)
     }
 }
 
-void SigmaWS::onError(void *arg, AsyncClient *c, int8_t error)
+void SigmaWsClient::onError(void *arg, AsyncClient *c, int8_t error)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP error: " + error;
     ws->PLogger->Append(errorStr).Internal();
     esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
 }
 
-void SigmaWS::onTimeout(void *arg, AsyncClient *c, uint32_t time)
+void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
 {
-    SigmaWS *ws = (SigmaWS *)arg;
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP timeout after " + String(time) + "ms";
     ws->PLogger->Append(errorStr).Internal();
     esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
     //    c->close();
 }
 
-bool SigmaWS::sendWebSocketTextFrame(const String &payload, bool isAuth)
+bool SigmaWsClient::sendWebSocketTextFrame(const String &payload, bool isAuth)
 {
     return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x01, isAuth);
 }
 
-bool SigmaWS::sendWebSocketBinaryFrame(const byte *data, size_t size)
+bool SigmaWsClient::sendWebSocketBinaryFrame(const byte *data, size_t size)
 {
     return sendWebSocketFrame(data, size, 0x02);
 }
 
-bool SigmaWS::sendWebSocketPingFrame(const String &payload)
+bool SigmaWsClient::sendWebSocketPingFrame(const String &payload)
 {
     return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x09);
 }
 
-bool SigmaWS::sendWebSocketPongFrame(const String &payload)
+bool SigmaWsClient::sendWebSocketPongFrame(const String &payload)
 {
     return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x0A);
 }
 
-bool SigmaWS::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth)
+bool SigmaWsClient::sendWebSocketCloseFrame()
+{
+    return sendWebSocketFrame(nullptr, 0, 0x08);
+}
+
+bool SigmaWsClient::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth)
 {
     if (!isReady && !isAuth)
     {

@@ -32,18 +32,18 @@ typedef struct
     String host;
     uint16_t port = 80;
     String clientId;
-    // String rootTopic = "/";
+    String rootPath = "/";
     String apiKey = "";
     bool convertToJson = false;
     byte authType = AUTH_TYPE_NONE;
     byte textFrameType = TEXT_FRAME_TYPE_NOPARSE;
 } WSConfig;
 
-class SigmaWS : public SigmaProtocol
+class SigmaWsClient : public SigmaProtocol
 {
 public:
-    SigmaWS(String name, WSConfig config);
-    SigmaWS();
+    SigmaWsClient(String name, WSConfig config);
+    SigmaWsClient();
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);
 

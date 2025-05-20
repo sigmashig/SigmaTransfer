@@ -1,7 +1,7 @@
 #include <Arduino.h>
 // #include <SigmaUART.h>
 // #include <SigmaMQTT.h>
-#include <SigmaWS.h>
+#include <SigmaWsClient.h>
 #include <SigmaAsyncNetwork.h>
 // #include <SigmaProtocolDefs.h>
 
@@ -208,11 +208,11 @@ void setup()
   String name = "WS";
   wsConfig.host = "192.168.0.102";
   wsConfig.port = 8080;
-  // wsConfig.rootTopic = "test/test1/";
+  wsConfig.rootPath = "/";
   wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
   wsConfig.apiKey = "secret-api-key-12345";
 
-  SigmaProtocol *WS = new SigmaWS(name, wsConfig);
+  SigmaProtocol *WS = new SigmaWsClient(name, wsConfig);
 
   espErr = esp_event_handler_instance_register_with(
       SigmaProtocol::GetEventLoop(),
