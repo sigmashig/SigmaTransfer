@@ -4,7 +4,7 @@
 
 ESP_EVENT_DEFINE_BASE(SIGMATRANSFER_EVENT);
 
-SigmaTransfer::SigmaTransfer(String ssid, String password) 
+SigmaTransfer::SigmaTransfer(String ssid, String password)
 {
     this->ssid = ssid;
     this->wifiPassword = password;
@@ -20,16 +20,24 @@ bool SigmaTransfer::AddProtocol(String name, SigmaProtocol *protocol)
     TLogger->Append("Adding protocol: ").Append(name).Internal();
     protocol->SetName(name);
     protocols[name] = protocol;
-    return true;
-}
+    String loopName = name + "_event_loop";
 
-/*
-bool SigmaTransfer::AddChannel(SigmaChannel *channel)
-{
-    channels[channel->GetConfig().correspondentId] = channel;
+    esp_event_loop_args_t loop_args = {
+        .queue_size = 100,
+        .task_name = loopName.c_str(),
+        .task_priority = 5,
+        .task_stack_size = 4096,
+        .task_core_id = 0};
+
+    esp_event_loop_handle_t eventLoop = nullptr;
+    esp_err_t espErr = esp_event_loop_create(&loop_args, &eventLoop);
+    if (espErr != ESP_OK)
+    {
+        TLogger->Printf("Failed to create event loop: %d", espErr).Internal();
+    }
+    protocol->SetEventLoop(eventLoop);
     return true;
 }
-*/
 
 bool SigmaTransfer::isWiFiRequired()
 {

@@ -4,8 +4,8 @@
 #include <SigmaChannel.h>
 #include <SigmaMQTT.h>
 
-SigmaTransfer *Transfer;
-esp_event_loop_handle_t SigmaTransfer_event_loop = nullptr;
+// SigmaTransfer *Transfer;
+// esp_event_loop_handle_t SigmaTransfer_event_loop = nullptr;
 #define PROTO_MQTT 0
 #define PROTO_UART 0
 #define PROTO_WS 1
@@ -111,18 +111,20 @@ void setup()
 }
 
 // init protocols
-Transfer = new SigmaTransfer("Sigma", "kybwynyd");
+SigmaTransfer *Transfer = new SigmaTransfer("Sigma", "kybwynyd");
 
 #if PROTO_WS == 1
-UartConfig uartConfig;
-uartConfig.txPin = 1;
-uartConfig.rxPin = 2;
-uartConfig.baudRate = 9600;
+WSConfig wsConfig;
+wsConfig.host = "192.168.0.102";
+wsConfig.port = 8080;
+wsConfig.rootTopic = "test/test1/";
+wsConfig.username = "test";
+wsConfig.password = "password";
+SigmaProtocol *WS = new SigmaWS("WS", wsConfig);
+Transfer->AddProtocol("WS", WS);
 
-SigmaProtocol *Uart = new SigmaUART(uartConfig);
-Transfer->AddProtocol("UART", Uart);
 espErr = esp_event_handler_instance_register_with(
-    SigmaTransfer_event_loop,
+    WS->GetEventLoop(),
     SIGMATRANSFER_EVENT,
     ESP_EVENT_ANY_ID,
     protocolEventHandler,

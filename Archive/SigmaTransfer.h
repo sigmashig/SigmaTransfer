@@ -6,11 +6,18 @@
 #include "SigmaLoger.h"
 #include "SigmaChannel.h"
 // #include <esp_event.h>
+ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
+
+struct WiFiConfigSta
+{
+    String ssid;
+    String password;
+};
 
 class SigmaTransfer
 {
 public:
-    SigmaTransfer(String ssid = "", String password = "");
+    SigmaTransfer(WiFiConfigSta config);
     ~SigmaTransfer();
     bool AddProtocol(String name, SigmaProtocol *protocol);
     bool Begin();
@@ -20,8 +27,7 @@ public:
 
 private:
     SigmaLoger *TLogger = new SigmaLoger(512);
-    inline static String ssid = "";
-    inline static String wifiPassword = "";
+    WiFiConfigSta wifiConfig;
     bool isWiFiStopped = false;
     TimerHandle_t wifiReconnectTimer;
     std::map<String, SigmaProtocol *> protocols;

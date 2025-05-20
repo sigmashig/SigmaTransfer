@@ -7,9 +7,11 @@
 #include <SigmaInternalPkg.h>
 #include <map>
 #include <esp_event.h>
-#include "SigmaProtocolDefs.h"
 #include "SigmaProtocol.h"
 #include <AsyncTCP.h>
+
+
+ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
 
 enum AuthType
 {
@@ -38,44 +40,28 @@ typedef struct
     byte textFrameType = TEXT_FRAME_TYPE_NOPARSE;
 } WSConfig;
 
-ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
-
 class SigmaWS : public SigmaProtocol
 {
 public:
-    SigmaWS(WSConfig config);
+    SigmaWS(String name, WSConfig config);
     SigmaWS();
-
-    void SetParams(WSConfig config);
-    bool BeginSetup();
-    bool FinalizeSetup();
     void Subscribe(TopicSubscription subscriptionTopic);
-    void Publish(String topic, String payload);
     void Unsubscribe(String topic);
 
     void SetClientId(String id) { clientId = id; };
     void Connect();
     void Disconnect();
-    bool IsReady() { return isReady; };
     bool IsNetworkRequired() { return true; };
     String GetName() { return name; };
-    void SetName(String name) { this->name = name; };
-    void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
-    bool GetShouldConnect() { return shouldConnect; };
     void Close()
     {
         shouldConnect = false;
         Disconnect();
     };
-    void SendWebSocketFrame(const String &payload, uint8_t opcode);
 
 private:
     WSConfig config;
-    inline static SigmaLoger *MLogger = new SigmaLoger(512);
-    bool isReady = false;
-    // bool wsConnected = false;
-    // bool wsHandshakeComplete = false;
-
+ 
     inline static String name;
     inline static TimerHandle_t mqttReconnectTimer;
     inline static String clientId;
@@ -89,8 +75,16 @@ private:
     static void onData(void *arg, AsyncClient *c, void *data, size_t len);
     static void onError(void *arg, AsyncClient *c, int8_t error);
     static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
+    void sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode);
     //   static String base64Encode(const byte *data, uint length);
     void setReady(bool ready);
+    static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    void sendWebSocketTextFrame(const String &payload);
+    void sendWebSocketBinaryFrame(const byte *data, size_t size);
+    void sendWebSocketPingFrame(const String &payload);
+    void sendWebSocketPongFrame(const String &payload);
+    void sendWebSocketCloseFrame();
 };
 
 #endif

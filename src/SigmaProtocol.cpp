@@ -2,23 +2,14 @@
 #include <WiFi.h>
 #include <esp_event.h>
 
-ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
-
-SigmaProtocol::SigmaProtocol(String loopName)
+SigmaProtocol::SigmaProtocol()
 {
-    messages = std::list<Message>();
-    queueMutex = xSemaphoreCreateMutex();
-    esp_event_loop_args_t loop_args = {
-        .queue_size = 100,
-        .task_name = loopName.c_str(),
-        .task_priority = 5,
-        .task_stack_size = 4096,
-        .task_core_id = 0};
-
+    //messages = std::list<Message>();
+    //queueMutex = xSemaphoreCreateMutex();
     esp_err_t espErr = esp_event_loop_create(&loop_args, &eventLoop);
     if (espErr != ESP_OK)
     {
-        PLogger->Printf("Failed to create event loop: %d", espErr).Internal();
+        Log->Printf("Failed to create event loop: %d", espErr).Internal();
         exit(1);
     }
 }
@@ -26,7 +17,20 @@ SigmaProtocol::SigmaProtocol(String loopName)
 SigmaProtocol::~SigmaProtocol()
 {
 }
-
+/*
+esp_err_t SigmaProtocol::PostEvent(int32_t eventId, void *eventData, size_t eventDataSize)
+{
+    if (eventLoop == nullptr)
+    {
+        return esp_event_post(SIGMAPROTOCOL_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
+    }
+    else
+    {
+        return esp_event_post_to(eventLoop, SIGMAPROTOCOL_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
+    }
+}
+*/
+/*
 void SigmaProtocol::Send(String topic, String payload)
 {
     if (!IsReady())
@@ -44,16 +48,10 @@ void SigmaProtocol::Send(String topic, String payload)
     }
     else
     {
-        Publish(topic, payload);
+        send(topic, payload);
     }
 }
-
-
-esp_err_t SigmaProtocol::PostEvent(int32_t event_id, void *event_data, size_t size)
-{
-        return esp_event_post_to(eventLoop, SIGMATRANSFER_EVENT, event_id, event_data, size, portMAX_DELAY);
-}
-
+*/
 bool SigmaProtocol::IsIP(String URL)
 {
     for (int i = 0; i < URL.length(); i++)
@@ -68,4 +66,14 @@ bool SigmaProtocol::IsIP(String URL)
         }
     }
     return true;
+}
+
+TopicSubscription *SigmaProtocol::GetSubscription(String topic)
+{
+    auto it = subscriptions.find(topic);
+    if (it != subscriptions.end())
+    {
+        return &it->second;
+    }
+    return nullptr;
 }

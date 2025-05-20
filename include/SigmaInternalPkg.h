@@ -31,6 +31,7 @@ public:
     int GetBinaryPayloadLength() { return binaryPayloadLength; };
     byte *GetBinaryPayload() { return binaryPayload; };
     bool IsError() { return isError; };
+    static bool IsSigmaInternalPkg(const String &msg);
 private:
     String protocol;
     String topic;

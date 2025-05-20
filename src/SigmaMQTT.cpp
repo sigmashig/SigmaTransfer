@@ -14,7 +14,8 @@ SigmaMQTT::SigmaMQTT(MqttConfig config)
     mqttClient.onMessage(onMqttMessage);
     // mqttClient.onPublish(onMqttPublish);
     eventMap.clear();
-    TimerCallbackFunction_t reconnectByTimer = [](TimerHandle_t xTimer) {
+    TimerCallbackFunction_t reconnectByTimer = [](TimerHandle_t xTimer)
+    {
         mqttClient.connect();
     };
     mqttReconnectTimer = xTimerCreate("mqttReconnectTimer", pdMS_TO_TICKS(1000), pdFALSE, NULL, reconnectByTimer);
@@ -25,7 +26,7 @@ void SigmaMQTT::SetParams(MqttConfig _config)
     this->config = _config;
     rootTopic = config.rootTopic;
     bool isIp = SigmaProtocol::IsIP(config.server);
- 
+
     if (isIp)
     {
         IPAddress ip;
@@ -64,11 +65,10 @@ bool SigmaMQTT::FinalizeSetup()
     return true;
 }
 
-
 void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 {
     String topic = config.rootTopic + subscriptionTopic.topic;
-    
+
     //    MLogger->Append("Add to map: ").Append(subscriptionTopic.topic).Internal();
     eventMap[topic] = subscriptionTopic;
     if (mqttClient.connected())
@@ -79,11 +79,11 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
     // MLogger->Append("Map size(2): ").Append(eventMap.size()).Internal();
 }
 
-void SigmaMQTT::Publish(String topic, String payload)
+void SigmaMQTT::send(String topic, String payload)
 {
     MLogger->Append("Publish: ").Append(topic).Append(" ").Append(payload).Info();
     MLogger->Append("Connected: ").Append(mqttClient.connected()).Info();
-    mqttClient.publish( (config.rootTopic + topic).c_str(), 0, false, payload.c_str());
+    mqttClient.publish((config.rootTopic + topic).c_str(), 0, false, payload.c_str());
 }
 
 void SigmaMQTT::Unsubscribe(String topic)
@@ -96,7 +96,7 @@ void SigmaMQTT::Unsubscribe(String topic)
 }
 void SigmaMQTT::Connect()
 {
- 
+
     MLogger->Append("..Connecting to MQTT").Info();
     mqttClient.connect();
 }
@@ -193,6 +193,6 @@ void SigmaMQTT::onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
     PostEvent(PROTOCOL_DISCONNECTED, (void *)(name.c_str()), name.length() + 1);
     if (shouldConnect)
     {
-     xTimerStart(mqttReconnectTimer, 0);
+        xTimerStart(mqttReconnectTimer, 0);
     }
 }

@@ -11,32 +11,31 @@
 #include "SigmaProtocolDefs.h"
 #include "SigmaProtocol.h"
 
-typedef struct {
+typedef struct
+{
     String server;
-    uint16_t port=1883;
+    uint16_t port = 1883;
     String rootTopic;
-    String username="";
-    String password="";
-    String clientId="Client_"+String(ESP.getEfuseMac(),HEX);
-    int keepAlive=60;
+    String username = "";
+    String password = "";
+    String clientId = "Client_" + String(ESP.getEfuseMac(), HEX);
+    int keepAlive = 60;
 } MqttConfig;
-
-
 
 class SigmaMQTT : public SigmaProtocol
 {
 public:
-    SigmaMQTT(MqttConfig config);
+    SigmaMQTT(MqttConfig config, esp_event_loop_handle_t eventLoop = nullptr);
     SigmaMQTT();
 
     void SetParams(MqttConfig config);
     bool BeginSetup();
     bool FinalizeSetup();
     void Subscribe(TopicSubscription subscriptionTopic);
-    void Publish(String topic, String payload);
+    void send(String topic, String payload);
     void Unsubscribe(String topic);
 
-    void SetClientId(String id) { clientId= id; };
+    void SetClientId(String id) { clientId = id; };
     void Connect();
     void Disconnect();
     bool IsReady();
@@ -45,9 +44,13 @@ public:
     void SetName(String name) { this->name = name; };
     void SetShouldConnect(bool shouldConnect) { this->shouldConnect = shouldConnect; };
     bool GetShouldConnect() { return shouldConnect; };
-    void Close() { shouldConnect = false; Disconnect(); };
-private:
+    void Close()
+    {
+        shouldConnect = false;
+        Disconnect();
+    };
 
+private:
     MqttConfig config;
     inline static SigmaLoger *MLogger = new SigmaLoger(512);
 
