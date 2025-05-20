@@ -51,13 +51,13 @@ public:
     ~SigmaAsyncNetwork();
     void Connect();
     void Disconnect();
-    bool IsConnected() { return isConnected; };
+    static bool IsConnected() { return isConnected; };
     static esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
 
 private:
     SigmaLoger *Log = new SigmaLoger(512);
     inline static WiFiConfigSta configWiFi;
-    bool isConnected = false;
+    inline static bool isConnected = false;
     bool shouldConnect = true;
     WorkMode mode = SIGMAASYNCNETWORK_MODE_NONE;
 
@@ -65,7 +65,7 @@ private:
     inline static esp_event_loop_handle_t eventLoop;
 
     void startWiFiSta();
-    static void reconnectWiFiSta();
+    static void reconnectWiFiSta(TimerHandle_t xTimer);
     esp_err_t postEvent(int32_t eventId, void *eventData = nullptr, size_t eventDataSize = 0);
 };
 

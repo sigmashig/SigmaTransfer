@@ -13,7 +13,7 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config) : mode(SIGMAASYNCNETW
         .task_stack_size = 4096,
         .task_core_id = 0};
     esp_err_t espErr = ESP_OK;
-    
+
     espErr = esp_event_loop_create(&loop_args, &eventLoop);
     if (espErr != ESP_OK)
     {
@@ -26,21 +26,23 @@ SigmaAsyncNetwork::~SigmaAsyncNetwork()
 {
 }
 
-void SigmaAsyncNetwork::reconnectWiFiSta()
+void SigmaAsyncNetwork::reconnectWiFiSta(TimerHandle_t xTimer)
 {
-        WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
+    //startWiFiSta();
+    WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
 }
 void SigmaAsyncNetwork::Connect()
 {
     if (mode == SIGMAASYNCNETWORK_MODE_STA)
     {
+        startWiFiSta();
         WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
     }
 }
 
 esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
-        return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
+    return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
 }
 void SigmaAsyncNetwork::startWiFiSta()
 {
@@ -57,6 +59,7 @@ void SigmaAsyncNetwork::startWiFiSta()
             isConnected = true;
             IPAddress ip = WiFi.localIP();
             postEvent(PROTOCOL_STA_CONNECTED, &ip, sizeof(ip));
+            break;
         }
         case SYSTEM_EVENT_STA_DISCONNECTED:
         {
@@ -73,6 +76,7 @@ void SigmaAsyncNetwork::startWiFiSta()
         case SYSTEM_EVENT_STA_START:
         case SYSTEM_EVENT_STA_CONNECTED:
         { // known event - do nothing
+            Log->Append("WiFi [0,2,4] event: ").Append(event).Internal();
             break;
         }
         default:

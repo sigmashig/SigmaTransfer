@@ -9,7 +9,7 @@ SigmaWS::SigmaWS(String name, WSConfig _config)
 {
     config = _config;
     this->name = name;
-    setRootTopic(config.rootTopic);
+    // setRootTopic(config.rootTopic);
     wsClient.onConnect(onConnect, this);
     wsClient.onDisconnect(onDisconnect, this);
     wsClient.onData(onData, this);
@@ -82,6 +82,11 @@ void SigmaWS::networkEventHandler(void *arg, esp_event_base_t event_base, int32_
 void SigmaWS::Connect()
 {
     PLogger->Internal("WS connecting");
+    if (!SigmaAsyncNetwork::IsConnected())
+    {
+        PLogger->Internal("WS cannot connect - network is not connected");
+        return;
+    }
     String url = config.host;
     if (config.authType & AUTH_TYPE_URL)
     {
@@ -110,16 +115,18 @@ void SigmaWS::onConnect(void *arg, AsyncClient *c)
 
     // Base64 encode the key
     char *buffer;
-    int bufferLen = base64_encode_expected_len(16);
+    int bufferLen = base64_encode_expected_len(16) + 1;
     buffer = (char *)malloc(bufferLen);
-    base64_encode_chars((char *)randomKey, 16, buffer);
+    int len = base64_encode_chars((char *)randomKey, 16, buffer);
+    buffer[len] = '\0';
     String wsKey = String(buffer);
     free(buffer);
-    ws->PLogger->Append("Generated WebSocket Key: ").Append(wsKey).Internal();
 
     // Create HTTP upgrade request
     String handshake = "GET ";
-    handshake += ws->config.rootTopic;
+    // handshake += ws->config.rootTopic;
+    handshake += "/";
+    // handshake += "\r\n";
     handshake += " HTTP/1.1\r\n";
     handshake += "Host: ";
     handshake += ws->config.host;
@@ -154,20 +161,15 @@ void SigmaWS::onConnect(void *arg, AsyncClient *c)
     if (wsClient.send())
     {
         ws->PLogger->Append("Sent WebSocket handshake").Internal();
-        ws->setReady(true);
     }
     else
     {
         ws->PLogger->Append("Failed to send WebSocket handshake").Internal();
     }
-    // IsReady set after first handshake
-
-    // ws->isReady = true;
-    if (ws->config.authType & (AUTH_TYPE_BASIC | AUTH_TYPE_URL | AUTH_TYPE_NONE))
+    if (ws->config.authType != AUTH_TYPE_FIRST_MESSAGE)
     {
         ws->setReady(true);
     }
-    ws->PLogger->Append("Sent WebSocket handshake").Internal();
 }
 
 void SigmaWS::setReady(bool ready)
@@ -186,7 +188,6 @@ void SigmaWS::onDisconnect(void *arg, AsyncClient *c)
 void SigmaWS::onData(void *arg, AsyncClient *c, void *data, size_t len)
 {
     SigmaWS *ws = (SigmaWS *)arg;
-    ws->PLogger->Append("Received data").Internal();
     char *buf = (char *)data;
     String response = String(buf, len);
     ws->PLogger->Append("Received data from WebSocket server").Internal();
@@ -199,14 +200,22 @@ void SigmaWS::onData(void *arg, AsyncClient *c, void *data, size_t len)
         ws->PLogger->Append("WebSocket handshake successful").Internal();
         if (!ws->isReady && ws->config.authType & (AUTH_TYPE_FIRST_MESSAGE))
         {
+            ws->PLogger->Append("Sending auth message").Internal();
             JsonDocument doc;
             doc["type"] = "auth";
             doc["apiKey"] = ws->config.apiKey;
             doc["client"] = ws->config.clientId;
             String jsonStr;
             serializeJson(doc, jsonStr);
-            ws->sendWebSocketTextFrame(jsonStr);
-            ws->setReady(true);
+            if (ws->sendWebSocketTextFrame(jsonStr, true))
+            {
+                ws->setReady(true);
+            }
+            else
+            {
+                ws->PLogger->Append("Failed to send auth message").Internal();
+                ws->setReady(false);
+            }
         }
         else
         {
@@ -385,32 +394,32 @@ void SigmaWS::onTimeout(void *arg, AsyncClient *c, uint32_t time)
     //    c->close();
 }
 
-void SigmaWS::sendWebSocketTextFrame(const String &payload)
+bool SigmaWS::sendWebSocketTextFrame(const String &payload, bool isAuth)
 {
-    sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x01);
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x01, isAuth);
 }
 
-void SigmaWS::sendWebSocketBinaryFrame(const byte *data, size_t size)
+bool SigmaWS::sendWebSocketBinaryFrame(const byte *data, size_t size)
 {
-    sendWebSocketFrame(data, size, 0x02);
+    return sendWebSocketFrame(data, size, 0x02);
 }
 
-void SigmaWS::sendWebSocketPingFrame(const String &payload)
-{   
-    sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x09);
+bool SigmaWS::sendWebSocketPingFrame(const String &payload)
+{
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x09);
 }
 
-void SigmaWS::sendWebSocketPongFrame(const String &payload)
+bool SigmaWS::sendWebSocketPongFrame(const String &payload)
 {
-    sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x0A);
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x0A);
 }
 
-void SigmaWS::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode)
+bool SigmaWS::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth)
 {
-    if (!isReady)
+    if (!isReady && !isAuth)
     {
         PLogger->Append("Cannot send message - not connected").Internal();
-        return;
+        return false;
     }
 
     // Create WebSocket frame
@@ -419,7 +428,7 @@ void SigmaWS::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte op
     // Payload length + mask + payload
 
     size_t headerSize = 2; // Basic header size
-    
+
     // Extended payload length
     if (payloadLen > 125 && payloadLen < 65536)
     {
@@ -473,9 +482,9 @@ void SigmaWS::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte op
     {
         buffer[headerSize + i] = payload[i] ^ maskKey[i % 4];
     }
-    
+
     // Send frame
     wsClient.add((const char *)buffer, headerSize + payloadLen);
-    wsClient.send();
     delete[] buffer;
+    return wsClient.send();
 }

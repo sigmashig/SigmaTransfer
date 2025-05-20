@@ -10,8 +10,7 @@
 #include "SigmaProtocol.h"
 #include <AsyncTCP.h>
 
-
-//ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
+// ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
 
 enum AuthType
 {
@@ -33,7 +32,7 @@ typedef struct
     String host;
     uint16_t port = 80;
     String clientId;
-    String rootTopic = "/";
+    // String rootTopic = "/";
     String apiKey = "";
     bool convertToJson = false;
     byte authType = AUTH_TYPE_NONE;
@@ -61,7 +60,7 @@ public:
 
 private:
     WSConfig config;
- 
+
     inline static String name;
     inline static TimerHandle_t mqttReconnectTimer;
     inline static String clientId;
@@ -75,16 +74,16 @@ private:
     static void onData(void *arg, AsyncClient *c, void *data, size_t len);
     static void onError(void *arg, AsyncClient *c, int8_t error);
     static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
-    void sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode);
+    bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
     //   static String base64Encode(const byte *data, uint length);
     void setReady(bool ready);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    void sendWebSocketTextFrame(const String &payload);
-    void sendWebSocketBinaryFrame(const byte *data, size_t size);
-    void sendWebSocketPingFrame(const String &payload);
-    void sendWebSocketPongFrame(const String &payload);
-    void sendWebSocketCloseFrame();
+    bool sendWebSocketTextFrame(const String &payload, bool isAuth = false);
+    bool sendWebSocketBinaryFrame(const byte *data, size_t size);
+    bool sendWebSocketPingFrame(const String &payload);
+    bool sendWebSocketPongFrame(const String &payload);
+    bool sendWebSocketCloseFrame();
 };
 
 #endif

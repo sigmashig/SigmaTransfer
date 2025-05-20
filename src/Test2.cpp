@@ -157,6 +157,8 @@ void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
 void setup()
 {
   Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println();
   Serial.println("----Hello, World!-----");
   Log = new SigmaLoger(512);
   esp_err_t espErr = ESP_OK;
@@ -200,15 +202,16 @@ void setup()
     exit(1);
   }
 
-  network->Connect();
-
 #if PROTO_WS == 1
 
   WSConfig wsConfig;
   String name = "WS";
   wsConfig.host = "192.168.0.102";
   wsConfig.port = 8080;
-  wsConfig.rootTopic = "test/test1/";
+  // wsConfig.rootTopic = "test/test1/";
+  wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  wsConfig.apiKey = "secret-api-key-12345";
+
   SigmaProtocol *WS = new SigmaWS(name, wsConfig);
 
   espErr = esp_event_handler_instance_register_with(
@@ -223,6 +226,7 @@ void setup()
     Log->Printf("Failed to register event handler: %d", espErr).Internal();
     exit(1);
   }
+  WS->Connect();
   // Start delayed messaging
   TestDelayedMessaging(name, SigmaProtocol::GetEventLoop());
 #endif
@@ -247,6 +251,7 @@ void setup()
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
   Transfer->AddProtocol("MQTT", Mqtt);
 #endif
+  network->Connect();
 }
 
 void loop()
