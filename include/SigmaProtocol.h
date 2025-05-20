@@ -72,6 +72,8 @@ protected:
     //   inline static esp_event_loop_handle_t eventLoop = nullptr;
     std::map<String, TopicSubscription> subscriptions;
     TopicSubscription *GetSubscription(String topic);
+    void addSubscription(TopicSubscription subscription);
+    void removeSubscription(String topic);
 private:
     const esp_event_loop_args_t loop_args = {
         .queue_size = 100,
@@ -79,7 +81,7 @@ private:
         .task_priority = 5, //priority must be lower the network loop
         .task_stack_size = 4096,
         .task_core_id = 1};
-    static esp_event_loop_handle_t eventLoop;
+    inline static esp_event_loop_handle_t eventLoop;
 };
 
 #endif

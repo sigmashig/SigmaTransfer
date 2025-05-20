@@ -11,7 +11,7 @@
 #include <AsyncTCP.h>
 
 
-ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
+//ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
 
 enum AuthType
 {

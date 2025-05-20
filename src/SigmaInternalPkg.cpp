@@ -100,3 +100,28 @@ SigmaInternalPkg::~SigmaInternalPkg()
         free(this->binaryPayload);
     }
 }
+
+bool SigmaInternalPkg::IsSigmaInternalPkg(const String &msg)
+{
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, msg);
+    if (error) {
+        return false;
+    }
+    if (!doc["protocol"].is<String>()) {
+        return false;
+    }
+    if (!doc["topic"].is<String>()) {
+        return false;
+    }
+    if (!doc["payload"].is<String>()) {
+        return false;
+    }
+    //   if (!doc["isBinary"].is<bool>()) {
+    //     return false;
+    // }
+    // if (!doc["length"].is<int>()) {
+    //     return false;
+    // }
+    return true;
+}

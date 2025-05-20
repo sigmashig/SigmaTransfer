@@ -27,6 +27,18 @@ SigmaWS::SigmaWS()
 {
 }
 
+void SigmaWS::Subscribe(TopicSubscription subscriptionTopic)
+{
+    addSubscription(subscriptionTopic);
+    // Nothing todo here
+}
+
+void SigmaWS::Unsubscribe(String topic)
+{
+    removeSubscription(topic);
+    // Nothing todo here
+}
+
 void SigmaWS::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaWS *ws = (SigmaWS *)arg;
@@ -76,6 +88,12 @@ void SigmaWS::Connect()
         url += "?apiKey=" + config.apiKey;
     }
     wsClient.connect(url.c_str(), config.port);
+}
+
+void SigmaWS::Disconnect()
+{
+    wsClient.close();
+    Connect();
 }
 
 void SigmaWS::onConnect(void *arg, AsyncClient *c)

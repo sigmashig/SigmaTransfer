@@ -77,3 +77,13 @@ TopicSubscription *SigmaProtocol::GetSubscription(String topic)
     }
     return nullptr;
 }
+
+void SigmaProtocol::addSubscription(TopicSubscription subscription)
+{
+    subscriptions[subscription.topic] = subscription;
+}
+
+void SigmaProtocol::removeSubscription(String topic)
+{
+    subscriptions.erase(topic);
+}
