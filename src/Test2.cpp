@@ -7,7 +7,8 @@
 
 #define PROTO_MQTT 0
 #define PROTO_UART 0
-#define PROTO_WS 1
+#define PROTO_WS_CLIENT 1
+#define PROTO_WS_SERVER 0
 enum
 {
   EVENT_TEST1 = 0x80,
@@ -202,33 +203,46 @@ void setup()
     exit(1);
   }
 
-#if PROTO_WS == 1
-
-  WSConfig wsConfig;
-  String name = "WS";
-  wsConfig.host = "192.168.0.102";
-  wsConfig.port = 8080;
-  wsConfig.rootPath = "/";
-  wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
-  wsConfig.apiKey = "secret-api-key-12345";
-
-  SigmaProtocol *WS = new SigmaWsClient(name, wsConfig);
-
-  espErr = esp_event_handler_instance_register_with(
-      SigmaProtocol::GetEventLoop(),
-      name.c_str(),
-      ESP_EVENT_ANY_ID,
-      protocolEventHandler,
-      WS,
-      NULL);
-  if (espErr != ESP_OK)
+#if PROTO_WS_CLIENT == 1
   {
-    Log->Printf("Failed to register event handler: %d", espErr).Internal();
-    exit(1);
+    WSClientConfig wsConfig;
+    String name = "WS";
+    wsConfig.host = "192.168.0.102";
+    wsConfig.port = 8080;
+    wsConfig.rootPath = "/";
+    wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+    wsConfig.apiKey = "secret-api-key-12345";
+
+    SigmaProtocol *WS = new SigmaWsClient(name, wsConfig);
+
+    espErr = esp_event_handler_instance_register_with(
+        SigmaProtocol::GetEventLoop(),
+        name.c_str(),
+        ESP_EVENT_ANY_ID,
+        protocolEventHandler,
+        WS,
+        NULL);
+    if (espErr != ESP_OK)
+    {
+      Log->Printf("Failed to register event handler: %d", espErr).Internal();
+      exit(1);
+    }
+    WS->Connect();
+    // Start delayed messaging
+    TestDelayedMessaging(name, SigmaProtocol::GetEventLoop());
   }
-  WS->Connect();
-  // Start delayed messaging
-  TestDelayedMessaging(name, SigmaProtocol::GetEventLoop());
+#endif
+
+#if PROTO_WS_SERVER == 1
+  {
+    WSServerConfig wsServerConfig;
+    wsServerConfig.port = 8080;
+    wsServerConfig.rootPath = "/";
+    wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+    wsServerConfig.apiKey = "secret-api-key-12345";
+    SigmaProtocol *WS = new SigmaWsServer(name, wsServerConfig);
+  }
+
 #endif
 
 #if PROTO_UART == 1

@@ -5,7 +5,7 @@
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 
-SigmaWsClient::SigmaWsClient(String name, WSConfig _config)
+SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config)
 {
     config = _config;
     this->name = name;
@@ -21,6 +21,7 @@ SigmaWsClient::SigmaWsClient(String name, WSConfig _config)
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
+    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 }
 
 SigmaWsClient::SigmaWsClient()

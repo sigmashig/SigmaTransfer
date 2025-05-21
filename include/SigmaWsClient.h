@@ -20,12 +20,6 @@ enum AuthType
     AUTH_TYPE_FIRST_MESSAGE = 0x04,
     AUTH_TYPE_ALL_MESSAGES = 0x08 // All messages are authenticated. convertToJson must be true
 };
-enum TextFrameType
-{
-    TEXT_FRAME_TYPE_NOPARSE = 0x01,
-    TEXT_FRAME_TYPE_PARSE = 0x02,
-
-};
 
 typedef struct
 {
@@ -34,24 +28,20 @@ typedef struct
     String clientId;
     String rootPath = "/";
     String apiKey = "";
-    bool convertToJson = false;
     byte authType = AUTH_TYPE_NONE;
-    byte textFrameType = TEXT_FRAME_TYPE_NOPARSE;
-} WSConfig;
+} WSClientConfig;
 
 class SigmaWsClient : public SigmaProtocol
 {
 public:
-    SigmaWsClient(String name, WSConfig config);
+    SigmaWsClient(String name, WSClientConfig config);
     SigmaWsClient();
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);
 
-    void SetClientId(String id) { clientId = id; };
     void Connect();
     void Disconnect();
     bool IsNetworkRequired() { return true; };
-    String GetName() { return name; };
     void Close()
     {
         shouldConnect = false;
@@ -59,14 +49,9 @@ public:
     };
 
 private:
-    WSConfig config;
+    WSClientConfig config;
 
-    inline static String name;
-    inline static TimerHandle_t mqttReconnectTimer;
-    inline static String clientId;
-
-    inline static std::map<String, TopicSubscription> eventMap;
-    inline static std::map<String, String> topicMsg;
+     inline static std::map<String, TopicSubscription> eventMap;
     inline static bool shouldConnect = true;
     inline static AsyncClient wsClient;
     static void onConnect(void *arg, AsyncClient *c);
@@ -75,7 +60,6 @@ private:
     static void onError(void *arg, AsyncClient *c, int8_t error);
     static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
     bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
-    //   static String base64Encode(const byte *data, uint length);
     void setReady(bool ready);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);

@@ -47,38 +47,32 @@ public:
     virtual void Close() = 0;
     virtual void Connect() = 0;
     virtual bool IsReady() { return isReady; };
-    virtual String GetName() = 0;
-    //virtual void SetShouldConnect(bool shouldConnect) = 0;
-    //virtual bool GetShouldConnect() = 0;
     virtual bool IsNetworkRequired() { return isNetworkRequired; };
-    //virtual bool BeginSetup() = 0;
-    //virtual bool FinalizeSetup() = 0;
     static bool IsIP(String URL);
+    virtual void SetClientId(String id) { clientId = id; };
     static esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
- 
-protected:
+    virtual String GetClientId() { return clientId; };
+    virtual String GetName() { return name; };
 
+protected:
     SigmaLoger *PLogger = new SigmaLoger(512);
     bool isNetworkRequired = false;
     String rootTopic = "/";
-    //inline static std::list<Message> messages;
-    //virtual void send(String topic, String payload) = 0;
     bool isReady = false;
     virtual void setReady(bool ready) = 0;
-    // virtual void SendBinary(byte *data, size_t size) = 0;
     void setRootTopic(String rootTopic) { this->rootTopic = rootTopic; };
-    // esp_err_t PostEvent(int32_t eventId, void *eventData = nullptr, size_t eventDataSize = 0);
-    //inline static SemaphoreHandle_t queueMutex = nullptr;
-    //   inline static esp_event_loop_handle_t eventLoop = nullptr;
     std::map<String, TopicSubscription> subscriptions;
     TopicSubscription *GetSubscription(String topic);
     void addSubscription(TopicSubscription subscription);
     void removeSubscription(String topic);
+    String clientId;
+    String name;
+
 private:
     const esp_event_loop_args_t loop_args = {
         .queue_size = 100,
         .task_name = "ProtocolEventLoop",
-        .task_priority = 5, //priority must be lower the network loop
+        .task_priority = 5, // priority must be lower the network loop
         .task_stack_size = 4096,
         .task_core_id = 1};
     inline static esp_event_loop_handle_t eventLoop;
