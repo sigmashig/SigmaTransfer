@@ -290,6 +290,18 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                         }
 
                         ws->PLogger->Append("Received: ").Append(payload).Internal();
+                        if (ws->config.authType & AUTH_TYPE_ALL_MESSAGES)
+                        {
+                            JsonDocument doc;
+                            deserializeJson(doc, payload);
+                            if (doc["authKey"] == nullptr || doc["authKey"] != ws->config.apiKey || doc["data"] == nullptr)
+                            {
+                                ws->PLogger->Append("Received message with invalid auth key or empty structure").Internal();
+                                return;
+                            }
+
+                            payload = doc["data"].as<String>();
+                        }
 
                         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
                         {
@@ -424,12 +436,32 @@ bool SigmaWsClient::sendWebSocketCloseFrame()
     return sendWebSocketFrame(nullptr, 0, 0x08);
 }
 
-bool SigmaWsClient::sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth)
+bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen, byte opcode, bool isAuth)
 {
     if (!isReady && !isAuth)
     {
         PLogger->Append("Cannot send message - not connected").Internal();
         return false;
+    }
+
+    byte *payload = (byte *)_payload;
+    size_t payloadLen = _payloadLen;
+    String jsonStr;
+
+    if (opcode == 0x01 && config.authType & AUTH_TYPE_ALL_MESSAGES)
+    {
+        // Convert to Json
+        // Text frame
+
+        JsonDocument doc;
+
+        doc["apiKey"] = config.apiKey;
+        doc["client"] = config.clientId;
+        doc["data"] = payload;
+        serializeJson(doc, jsonStr);
+
+        payload = (byte *)jsonStr.c_str();
+        payloadLen = jsonStr.length();
     }
 
     // Create WebSocket frame

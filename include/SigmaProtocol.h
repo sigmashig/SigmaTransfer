@@ -27,6 +27,14 @@ typedef struct
     byte *data;
     size_t size;
 } BinaryData;
+enum AuthType
+{
+    AUTH_TYPE_NONE = 0,
+    AUTH_TYPE_URL = 0x01,
+    AUTH_TYPE_BASIC = 0x02,
+    AUTH_TYPE_FIRST_MESSAGE = 0x04,
+    AUTH_TYPE_ALL_MESSAGES = 0x08 // All messages are authenticated. No Binary Data. Text/Sigma Only. Converted to Json
+};
 
 class SigmaProtocol
 {

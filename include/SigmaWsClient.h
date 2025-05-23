@@ -10,17 +10,6 @@
 #include "SigmaProtocol.h"
 #include <AsyncTCP.h>
 
-// ESP_EVENT_DEFINE_BASE(PROTOCOL_WS);
-
-enum AuthType
-{
-    AUTH_TYPE_NONE = 0,
-    AUTH_TYPE_URL = 0x01,
-    AUTH_TYPE_BASIC = 0x02,
-    AUTH_TYPE_FIRST_MESSAGE = 0x04,
-    AUTH_TYPE_ALL_MESSAGES = 0x08 // All messages are authenticated. convertToJson must be true
-};
-
 typedef struct
 {
     String host;
@@ -51,7 +40,7 @@ public:
 private:
     WSClientConfig config;
 
-     inline static std::map<String, TopicSubscription> eventMap;
+    inline static std::map<String, TopicSubscription> eventMap;
     inline static bool shouldConnect = true;
     inline static AsyncClient wsClient;
     static void onConnect(void *arg, AsyncClient *c);
