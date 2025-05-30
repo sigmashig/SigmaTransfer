@@ -11,7 +11,7 @@ typedef struct
     String clientId="";
     String payload="";
     bool isBinary=false;
-    String protocol="";
+    //String protocol="";
     String topic="";
     byte *binaryPayload=nullptr;
     int binaryPayloadLength=0;
@@ -31,9 +31,9 @@ class SigmaInternalPkg
 public:
     // Raw message
     // String message plain or encoded binary
-    SigmaInternalPkg(String protocol, String topic, String payload, bool isBinary = false, String clientId = "");
+    SigmaInternalPkg(String topic, String payload, bool isBinary = false, String clientId = "");
     // binary message. The message will be sent as binary when isBinary is true and will sent as text and the encoded binary when isBinary is false 
-    SigmaInternalPkg(String protocol, String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary = false, String clientId = "");
+    SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary = false, String clientId = "");
 
 
     // prepare for deserialize
@@ -47,7 +47,6 @@ public:
 
     String GetTopic() { return pkgData.topic; };
     String GetPayload() { return pkgData.payload; };
-    String GetProtocol() { return pkgData.protocol; };
     String GetPkgString() { return pkgString; };
     int GetBinaryPayloadLength() { return pkgData.binaryPayloadLength; };
     byte *GetBinaryPayload() { return (byte *)pkgData.payload.c_str(); };
@@ -71,7 +70,7 @@ private:
     bool isAllocated = false;
     bool isError = false;
 
-    void init(String protocol, String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength);
+    void init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength);
 };
 
 #endif

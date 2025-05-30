@@ -47,15 +47,22 @@ void TestMessaging(SigmaProtocol *protocol, esp_event_loop_handle_t eventLoop)
   }
 }
 
+void genericEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+  Log->Append("Generic event").Internal();
+  Log->Append("Base: ").Append(event_base).Append(" ID: ").Append(event_id).Internal();
+}
+
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
+  Log->Append("Protocol event").Internal();
   SigmaProtocol *protocol = (SigmaProtocol *)arg;
   if (protocol == NULL)
   {
     Log->Append("Protocol is NULL").Internal();
     return;
   }
-  Log->Append("Base: ").Append(event_base).Append(" ID: ").Append(event_id).Append(" Protocol: ").Append(protocol->GetName()).Internal();
+  Log->Append("Base:").Append(event_base).Append("#ID: ").Append(event_id).Append(" Protocol: ").Append(protocol->GetName()).Internal();
   if (event_id == PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE)
   {
     String pkg = String((char *)event_data);
@@ -115,6 +122,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 
 void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
+  Log->Append("Network event").Internal();
   SigmaAsyncNetwork *network = (SigmaAsyncNetwork *)arg;
   if (network == NULL)
   {
@@ -158,6 +166,7 @@ void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
 
 void setup()
 {
+  SigmaProtocol *protocol = NULL;
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
@@ -235,28 +244,29 @@ void setup()
 #endif
 
 #if PROTO_WS_SERVER == 1
+
+  WSServerConfig wsServerConfig;
+  wsServerConfig.port = 8080;
+  wsServerConfig.rootPath = "/";
+  wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  SigmaWsServer *WServer = new SigmaWsServer("WSserver", wsServerConfig);
+  protocol = WServer;
+  WServer->AddAllowableClient("123", "secret-api-key-12345");
+
+  espErr = esp_event_handler_instance_register_with(
+      SigmaProtocol::GetEventLoop(),
+      WServer->GetName().c_str(),
+      ESP_EVENT_ANY_ID,
+      protocolEventHandler,
+      WServer,
+      NULL);
+  if (espErr != ESP_OK)
   {
-    WSServerConfig wsServerConfig;
-    wsServerConfig.port = 8080;
-    wsServerConfig.rootPath = "/";
-    wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
-    wsServerConfig.apiKey = "secret-api-key-12345";
-    String name = "WServer";
-    SigmaProtocol *WServer = new SigmaWsServer(name, wsServerConfig);
-    espErr = esp_event_handler_instance_register_with(
-        SigmaProtocol::GetEventLoop(),
-        name.c_str(),
-        ESP_EVENT_ANY_ID,
-        protocolEventHandler,
-        WServer,
-        NULL);
-    if (espErr != ESP_OK)
-    {
-      Log->Printf("Failed to register event handler: %d", espErr).Internal();
-      exit(1);
-    }
-    WServer->Connect();
+    Log->Printf("Failed to register event handler: %d", espErr).Internal();
+    exit(1);
   }
+  // esp_event_post_to(SigmaProtocol::GetEventLoop(), name.c_str(), 123, (void*)"Zero \0", 6, portMAX_DELAY);
+  // WServer->Connect();
 
 #endif
 
@@ -280,7 +290,24 @@ void setup()
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
   Transfer->AddProtocol("MQTT", Mqtt);
 #endif
+  espErr = esp_event_handler_instance_register_with(
+      SigmaProtocol::GetEventLoop(),
+      ESP_EVENT_ANY_BASE,
+      ESP_EVENT_ANY_ID,
+      genericEventHandler,
+      NULL,
+      NULL);
+  if (espErr != ESP_OK)
+  {
+    Log->Printf("Failed to register network event handler: %d", espErr).Internal();
+    exit(1);
+  }
+
   network->Connect();
+  delay(1000);
+  // ulong loopHandle = (ulong)SigmaProtocol::GetEventLoop();
+  // Log->Append("Loop handle:").Append(loopHandle).Internal();
+  esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
 }
 
 void loop()

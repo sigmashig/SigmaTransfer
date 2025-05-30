@@ -3,7 +3,7 @@
 #include <libb64/cdecode.h>
 #include <libb64/cencode.h>
 
-SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, String payload, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, bool isBinary, String clientId)
 {
     int length;
     byte *binaryPayload = nullptr;
@@ -22,12 +22,12 @@ SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, String payload
         binaryPayload = nullptr;
     }
     
-    init(protocol, topic, payload, isBinary, clientId, binaryPayload, length);
+    init(topic, payload, isBinary, clientId, binaryPayload, length);
 }
 
 
 
-SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary, String clientId)
 {
     int length;
     String payload = "";
@@ -36,12 +36,12 @@ SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, byte *binaryPa
     payload = GetEncoded(binaryPayload, binaryPayloadLength);
     this->isAllocated = false;
 
-    init(protocol, topic, payload, isBinary, clientId, binaryPayload, binaryPayloadLength);
+    init(topic, payload, isBinary, clientId, binaryPayload, binaryPayloadLength);
 }
 
-void SigmaInternalPkg::init(String protocol, String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
+void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
 {
-    pkgData.protocol = protocol;
+    //pkgData.protocol = protocol;
     pkgData.topic = topic;
     pkgData.isBinary = isBinary;
     pkgData.clientId = clientId;
@@ -49,7 +49,7 @@ void SigmaInternalPkg::init(String protocol, String topic, String payload, bool 
     pkgData.binaryPayload = binaryPayload;
     JsonDocument doc;
     doc["clientId"] = pkgData.clientId;
-    doc["protocol"] = pkgData.protocol;
+    //doc["protocol"] = pkgData.protocol;
     doc["topic"] = pkgData.topic;
     doc["payload"] = pkgData.payload;
     doc["isBinary"] = pkgData.isBinary;
@@ -88,7 +88,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
 
 
 
-    init(doc["protocol"].as<String>(), doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
+    init(doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
     
 }
 
@@ -106,28 +106,31 @@ bool SigmaInternalPkg::IsSigmaInternalPkg(const String &msg)
     DeserializationError error = deserializeJson(doc, msg);
     if (error)
     {
+        Serial.printf("Error deserializing JSON: %s\n", error.c_str());
         return false;
     }
-    if (!doc["protocol"].is<String>())
-    {
-        return false;
-    }
+    //if (!doc["protocol"].is<String>())
+    //{
+    //    return false;
+    //}
     if (!doc["topic"].is<String>())
     {
+        Serial.println("topic not found");
         return false;
     }
     if (!doc["payload"].is<String>())
     {
+        Serial.println("payload not found");
         return false;
     }
-    if (!doc["isBinary"].is<bool>())
-    {
-        return false;
-    }
-    if (!doc["length"].is<int>())
-    {
-        return false;
-    }
+    //if (!doc["isBinary"].is<bool>())
+    //{
+    //    return false;
+    //}
+    //if (!doc["length"].is<int>())
+    //{
+    //    return false;
+    //}
     return true;
 }
 

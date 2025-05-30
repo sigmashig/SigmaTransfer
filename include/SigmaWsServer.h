@@ -15,7 +15,7 @@ typedef struct
 {
     uint16_t port = 80;
     String rootPath = "/";
-    String apiKey = "";
+    // String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
 
 } WSServerConfig;
@@ -105,14 +105,7 @@ private:
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     inline static std::map<int32_t, ClientAuth> clients;
     bool clientAuthRequest(String payload);
-    bool isClientAvailable(String clientId, String authKey)
-    {
-        if (allowableClients.find(clientId) != allowableClients.end())
-        {
-            return allowableClients[clientId].authKey == authKey;
-        }
-        return false;
-    }
+    bool isClientAvailable(String clientId, String authKey);
 
     static void processData(void *arg);
     inline static QueueHandle_t xQueue;

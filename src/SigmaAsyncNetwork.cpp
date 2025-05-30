@@ -5,6 +5,7 @@ ESP_EVENT_DEFINE_BASE(SIGMAASYNCNETWORK_EVENT);
 SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config) : mode(SIGMAASYNCNETWORK_MODE_STA)
 {
     configWiFi = config;
+    Log->Append("Configuring WiFi network: ").Append(configWiFi.ssid).Info();
     wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
     esp_event_loop_args_t loop_args = {
         .queue_size = 100,
@@ -46,7 +47,6 @@ esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t 
 }
 void SigmaAsyncNetwork::startWiFiSta()
 {
-    Log->Append("Connecting to WiFi network(STA mode): ").Append(configWiFi.ssid).Internal();
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         //PLogger->Append("WiFi event: ").Append(event).Internal();
@@ -76,7 +76,7 @@ void SigmaAsyncNetwork::startWiFiSta()
         case SYSTEM_EVENT_STA_START:
         case SYSTEM_EVENT_STA_CONNECTED:
         { // known event - do nothing
-            Log->Append("WiFi [0,2,4] event: ").Append(event).Internal();
+            //Log->Append("WiFi [0,2,4] event: ").Append(event).Internal();
             break;
         }
         default:
