@@ -3,94 +3,93 @@
 #include <libb64/cdecode.h>
 #include <libb64/cencode.h>
 
-SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, String payload)
+SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, String payload, bool isBinary, String clientId)
 {
-    this->protocol = protocol;
-    this->topic = topic;
-    this->payload = payload;
-    this->isBinary = false;
-    this->length = payload.length();
-    this->binaryPayload = nullptr;
-    this->binaryPayloadLength = 0;
-
-    JsonDocument doc;
-    doc["protocol"] = protocol;
-    doc["topic"] = topic;
-    doc["payload"] = payload;
-    doc["isBinary"] = isBinary;
-    doc["length"] = payload.length();
-    serializeJson(doc, this->pkgString);
+    int length;
+    byte *binaryPayload = nullptr;
+   
+    if (isBinary)
+    { // the payload contains an encoded binary
+        length = GetDecodedLength(payload.length());
+        binaryPayload = (byte *)malloc(length);
+        this->isAllocated = true;
+        length = GetDecoded(payload, pkgData.binaryPayload);
+    }
+    else
+    {
+        this->isAllocated = false;
+        length = payload.length();
+        binaryPayload = nullptr;
+    }
+    
+    init(protocol, topic, payload, isBinary, clientId, binaryPayload, length);
 }
 
-SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, byte *binaryPayload, int binaryPayloadLength)
+
+
+SigmaInternalPkg::SigmaInternalPkg(String protocol, String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary, String clientId)
 {
-    this->protocol = protocol;
-    this->topic = topic;
-    this->binaryPayload = binaryPayload;
-    this->binaryPayloadLength = binaryPayloadLength;
+    int length;
+    String payload = "";
 
-    char *buffer;
-    int bufferLen = base64_encode_expected_len(binaryPayloadLength);
-    buffer = (char *)malloc(bufferLen);
+    length = GetEncodedLength(binaryPayloadLength);
+    payload = GetEncoded(binaryPayload, binaryPayloadLength);
+    this->isAllocated = false;
 
-    base64_encode_chars((char *)binaryPayload, binaryPayloadLength, buffer);
-    this->payload = String(buffer);
-    free(buffer);
+    init(protocol, topic, payload, isBinary, clientId, binaryPayload, binaryPayloadLength);
+}
+
+void SigmaInternalPkg::init(String protocol, String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
+{
+    pkgData.protocol = protocol;
+    pkgData.topic = topic;
+    pkgData.isBinary = isBinary;
+    pkgData.clientId = clientId;
+    pkgData.binaryPayloadLength = binaryPayloadLength;
+    pkgData.binaryPayload = binaryPayload;
     JsonDocument doc;
-    doc["protocol"] = protocol;
-    doc["topic"] = topic;
-    doc["payload"] = payload;
-    doc["isBinary"] = true;
-    doc["length"] = binaryPayloadLength;
-    // String jsonString = "";
-    serializeJson(doc, this->pkgString);
+    doc["clientId"] = pkgData.clientId;
+    doc["protocol"] = pkgData.protocol;
+    doc["topic"] = pkgData.topic;
+    doc["payload"] = pkgData.payload;
+    doc["isBinary"] = pkgData.isBinary;
+    doc["binaryPayloadLength"] = pkgData.binaryPayloadLength;
+    serializeJson(doc, pkgString);
 }
 
 SigmaInternalPkg::SigmaInternalPkg(const char *msg)
 {
+    if (!IsSigmaInternalPkg(msg))
+    {
+        this->isError = true;
+        return;
+    }
     JsonDocument doc;
-    deserializeJson(doc, msg);
-    if (doc["protocol"].is<String>()) {
-        this->protocol = doc["protocol"].as<String>();
-    }
-    else
+    DeserializationError error = deserializeJson(doc, msg);
+    if (error)
     {
         this->isError = true;
+        return;
     }
-    if (doc["topic"].is<String>())
-    {
-        this->topic = doc["topic"].as<String>();
-    }
-    else
-    {
-        this->isError = true;
-    }
-    if (doc["isBinary"].is<bool>())
-    {
-        this->isBinary = doc["isBinary"].as<bool>();
-    }
-    else
-    {
-        this->isError = true;
-    }
-    if (doc["length"].is<int>())
-    {
-        this->length = doc["length"].as<int>();
-    }
-    else
-    {
-        this->isError = true;
-    }
-    if (this->isBinary && !this->isError)
-    {
-        this->binaryPayload = (byte *)malloc(this->length);
+    int length = 0;
+    byte *binaryPayload = nullptr;
+    if (doc["isBinary"].as<bool>())
+    { // the payload contains an encoded binary
+        length = GetDecodedLength(doc["payload"].as<String>().length());
+        binaryPayload = (byte *)malloc(length);
         this->isAllocated = true;
-        base64_decode_chars(this->payload.c_str(), this->length, (char *)this->binaryPayload);
+        length = GetDecoded(doc["payload"].as<String>(), binaryPayload);
     }
     else
     {
-        this->payload = doc["payload"].as<String>();
+        this->isAllocated = false;
+        binaryPayload = nullptr;
     }
+
+
+
+    init(doc["protocol"].as<String>(), doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
+    
 }
 
 SigmaInternalPkg::~SigmaInternalPkg()
@@ -105,23 +104,59 @@ bool SigmaInternalPkg::IsSigmaInternalPkg(const String &msg)
 {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, msg);
-    if (error) {
+    if (error)
+    {
         return false;
     }
-    if (!doc["protocol"].is<String>()) {
+    if (!doc["protocol"].is<String>())
+    {
         return false;
     }
-    if (!doc["topic"].is<String>()) {
+    if (!doc["topic"].is<String>())
+    {
         return false;
     }
-    if (!doc["payload"].is<String>()) {
+    if (!doc["payload"].is<String>())
+    {
         return false;
     }
-    //   if (!doc["isBinary"].is<bool>()) {
-    //     return false;
-    // }
-    // if (!doc["length"].is<int>()) {
-    //     return false;
-    // }
+    if (!doc["isBinary"].is<bool>())
+    {
+        return false;
+    }
+    if (!doc["length"].is<int>())
+    {
+        return false;
+    }
     return true;
+}
+
+int SigmaInternalPkg::GetEncodedLength(int length)
+{
+    return base64_encode_expected_len(length);
+}
+
+String SigmaInternalPkg::GetEncoded(byte *data, int length)
+{
+    String msg = "";
+    char *buffer;
+    int bufferLen = base64_encode_expected_len(length);
+    buffer = (char *)malloc(bufferLen);
+    base64_encode_chars((char *)data, length, buffer);
+    msg = String(buffer);
+    free(buffer);
+
+    return msg;
+}
+
+int SigmaInternalPkg::GetDecodedLength(int length)
+{
+
+    return base64_decode_expected_len(length);
+}
+
+int SigmaInternalPkg::GetDecoded(String data, byte *encodedData)
+{
+    int length = GetDecodedLength(data.length());
+    return base64_decode_chars(data.c_str(), length, (char *)encodedData);
 }

@@ -32,6 +32,7 @@ typedef struct
     // String authKey;
     int32_t clientIdInt;
     bool isAuth = false;
+    AsyncWebSocketClient *wsClient;
 } ClientAuth;
 
 typedef struct
@@ -72,17 +73,22 @@ public:
     {
         allowableClients.erase(clientId);
     }
-    ClientAuth GetClientAuth(String clientId)
+    const ClientAuth *GetClientAuth(String clientId)
     {
         for (auto const &client : clients)
         {
             if (client.second.clientId == clientId)
             {
-                return client.second;
+                return &client.second;
             }
         }
-        return ClientAuth();
+        return nullptr;
     }
+    bool sendMessageToClient(String clientId, String message);
+    bool sendMessageToClient(String clientId, byte *data, size_t size);
+    bool sendPingToClient(String clientId, String payload);
+    bool sendPongToClient(String clientId, String payload);
+    void setReady(bool ready) { isReady = ready; };
 
 private:
     SigmaLoger *Log = new SigmaLoger(512);
@@ -96,7 +102,8 @@ private:
 
     static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
-    static std::map<int32_t, ClientAuth> clients;
+    static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    inline static std::map<int32_t, ClientAuth> clients;
     bool clientAuthRequest(String payload);
     bool isClientAvailable(String clientId, String authKey)
     {
@@ -109,6 +116,9 @@ private:
 
     static void processData(void *arg);
     inline static QueueHandle_t xQueue;
+    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    bool shouldConnect = true;
+
     // inline static AsyncClient wsClient;
     // static void onConnect(void *arg, AsyncClient *c);
     // static void onDisconnect(void *arg, AsyncClient *c);

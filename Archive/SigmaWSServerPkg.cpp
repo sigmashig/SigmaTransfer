@@ -1,8 +1,8 @@
-#include "SigmaWSInternalPkg.h"
+#include "SigmaWSServerPkg.h"
 #include <libb64/cdecode.h>
 #include <libb64/cencode.h>
 
-String SigmaWSInternalPkg::GetEncoded(byte *data, int length)
+String SigmaWSServerPkg::GetEncoded(byte *data, int length)
 {
     String msg = "";
     char *buffer;
@@ -15,12 +15,12 @@ String SigmaWSInternalPkg::GetEncoded(byte *data, int length)
     return msg;
 }
 
-int SigmaWSInternalPkg::GetDecodedLength(String data)
+int SigmaWSServerPkg::GetDecodedLength(String data)
 {
     return base64_decode_expected_len(data.length());
 }
 
-int SigmaWSInternalPkg::GetDecoded(String data, byte *encodedData)
+int SigmaWSServerPkg::GetDecoded(String data, byte *encodedData)
 {
     int length = GetDecodedLength(data);
     return base64_decode_chars(data.c_str(), length, (char *)encodedData);

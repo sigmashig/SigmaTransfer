@@ -3,12 +3,13 @@
 // #include <SigmaMQTT.h>
 #include <SigmaWsClient.h>
 #include <SigmaAsyncNetwork.h>
+#include <SigmaWsServer.h>
 // #include <SigmaProtocolDefs.h>
 
 #define PROTO_MQTT 0
 #define PROTO_UART 0
-#define PROTO_WS_CLIENT 1
-#define PROTO_WS_SERVER 0
+#define PROTO_WS_CLIENT 0
+#define PROTO_WS_SERVER 1
 enum
 {
   EVENT_TEST1 = 0x80,
@@ -240,7 +241,21 @@ void setup()
     wsServerConfig.rootPath = "/";
     wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
     wsServerConfig.apiKey = "secret-api-key-12345";
-    SigmaProtocol *WS = new SigmaWsServer(name, wsServerConfig);
+    String name = "WServer";
+    SigmaProtocol *WServer = new SigmaWsServer(name, wsServerConfig);
+    espErr = esp_event_handler_instance_register_with(
+        SigmaProtocol::GetEventLoop(),
+        name.c_str(),
+        ESP_EVENT_ANY_ID,
+        protocolEventHandler,
+        WServer,
+        NULL);
+    if (espErr != ESP_OK)
+    {
+      Log->Printf("Failed to register event handler: %d", espErr).Internal();
+      exit(1);
+    }
+    WServer->Connect();
   }
 
 #endif
