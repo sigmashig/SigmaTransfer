@@ -1,2 +1,2 @@
-{"clientId":"123","authKey":"secret-api-key-12345"}
+{"clientId":"W123","authKey":"secret-api-key-12345"}
 {"topic":"test","payload":"Hello, World!"}

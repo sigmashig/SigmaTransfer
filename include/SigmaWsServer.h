@@ -17,6 +17,8 @@ typedef struct
     String rootPath = "/";
     // String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
+    byte maxClients = 10;
+    byte maxConnectionsPerClient = 1;
 
 } WSServerConfig;
 
@@ -104,8 +106,12 @@ private:
     static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     inline static std::map<int32_t, ClientAuth> clients;
-    bool clientAuthRequest(String payload);
+    bool clientAuthRequest(String payload, String &clientId);
     bool isClientAvailable(String clientId, String authKey);
+
+    bool isClientLimitReached(SigmaWsServer *server, AsyncWebSocketClient *client);
+
+    bool isConnectionLimitReached(String clientId, SigmaWsServer *server, AsyncWebSocketClient *client);
 
     static void processData(void *arg);
     inline static QueueHandle_t xQueue;

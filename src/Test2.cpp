@@ -249,9 +249,11 @@ void setup()
   wsServerConfig.port = 8080;
   wsServerConfig.rootPath = "/";
   wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  wsServerConfig.maxClients = 10;
+  wsServerConfig.maxConnectionsPerClient = 1;
   SigmaWsServer *WServer = new SigmaWsServer("WSserver", wsServerConfig);
   protocol = WServer;
-  WServer->AddAllowableClient("123", "secret-api-key-12345");
+  WServer->AddAllowableClient("W123", "secret-api-key-12345");
 
   espErr = esp_event_handler_instance_register_with(
       WServer->GetEventLoop(),

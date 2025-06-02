@@ -14,14 +14,13 @@ SigmaWsServer::SigmaWsServer(String name, WSServerConfig config, int priority) :
     xQueue = xQueueCreate(10, sizeof(SigmaWsServerData));
     xTaskCreate(processData, "ProcessData", 4096, this, 1, NULL);
 
-    
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
- 
+
     server = new AsyncWebServer(config.port);
     ws = new AsyncWebSocket(config.rootPath);
     ws->onEvent(onWsEvent);
@@ -147,6 +146,11 @@ void SigmaWsServer::processData(void *arg)
             case WS_EVT_CONNECT:
             {
                 server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Internal();
+                if (server->isClientLimitReached(server, data.wsClient))
+                {
+                    return;
+                }
+                
                 ClientAuth auth;
                 auth.clientId = "";
                 auth.clientIdInt = data.wsClient->id();
@@ -167,6 +171,10 @@ void SigmaWsServer::processData(void *arg)
                         {
                             auth.clientId = clientId;
                             auth.isAuth = true;
+                            if (server->isConnectionLimitReached(clientId, server, data.wsClient))
+                            {
+                                return;
+                            }
                         }
                         else
                         {
@@ -213,6 +221,13 @@ void SigmaWsServer::processData(void *arg)
 void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data)
 {
     ClientAuth *auth = &(server->clients[data.wsClient->id()]);
+    /*
+    if (data.wsClient->status() == WS_DISCONNECTED || data.wsClient->status() == WS_DISCONNECTING)
+    {
+        server->Log->Append("Client ").Append(auth->clientId).Append(" closed.").Append("Status:").Append(data.wsClient->status()).Internal();
+        return;
+    }
+    */
     server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->isAuth).Internal();
     if (data.frameInfo->opcode == WS_BINARY)
     {
@@ -238,29 +253,37 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
         server->Log->Append("Payload: ").Append(payload).Internal();
         if ((!auth->isAuth && server->config.authType == AUTH_TYPE_FIRST_MESSAGE) || server->config.authType == AUTH_TYPE_ALL_MESSAGES)
         {
-            if (server->clientAuthRequest(payload))
+            String clientId = "";
+            if (server->clientAuthRequest(payload, clientId))
             {
                 auth->isAuth = true;
-                auth->clientId = data.wsClient->id();
+                auth->clientIdInt = data.wsClient->id();
+                auth->clientId = clientId;
+                if (server->isConnectionLimitReached(auth->clientId, server, data.wsClient))
+                {
+                    return;
+                }
             }
             else
             {
                 server->Log->Printf("Client %s is not authenticated", auth->clientId.c_str()).Error();
                 data.wsClient->close();
                 server->clients.erase(data.wsClient->id());
+                return;
             }
         }
-        server->Log->Append("Sending event to protocol(raw):").Append(server->name).Append("#").Append(payload).Internal();
-        
-        esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
-        if (espErr != ESP_OK)
-        {
-            server->Log->Printf("Failed to send event(raw) to protocol: %d", espErr).Error();
-        }
+        server->Log->Append("Client status").Append(data.wsClient->status()).Internal();
+
+        // esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        // if (espErr != ESP_OK)
+        //{
+        //     server->Log->Printf("Failed to send event(raw) to protocol: %d", espErr).Error();
+        // }
         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
         {
             SigmaInternalPkg pkg(payload);
-            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
+            server->Log->Append("Sending event to protocol(sigma):").Append(server->name).Append("#").Append(pkg.GetTopic()).Internal();
+            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {
                 server->Log->Printf("Failed to send event to protocol: %d", espErr).Error();
@@ -268,7 +291,15 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             auto subscription = server->subscriptions.find(pkg.GetTopic());
             if (subscription != server->subscriptions.end())
             {
-                esp_event_post_to(server->GetEventLoop(), server->name.c_str(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
+                server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
+                esp_event_post_to(server->GetEventLoop(), server->name.c_str(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+            }
+        } else {
+            server->Log->Append("Sending RAW event:").Append(payload).Internal();
+            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+            if (espErr != ESP_OK)
+            {
+                server->Log->Printf("Failed to send event to protocol: %d", espErr).Error();
             }
         }
         server->Log->Append("DATA HANDLED").Internal();
@@ -319,7 +350,7 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
     }
 }
 
-bool SigmaWsServer::clientAuthRequest(String payload)
+bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
 {
     Log->Append("Client auth request:").Append(payload).Internal();
     JsonDocument doc;
@@ -329,12 +360,13 @@ bool SigmaWsServer::clientAuthRequest(String payload)
         Log->Append("Failed to deserialize JSON: ").Append(error.c_str()).Error();
         return false;
     }
-    String clientId = doc["clientId"].as<String>();
+    String cId = doc["clientId"].as<String>();
     String authKey = doc["authKey"].as<String>();
-    Log->Append("Client ID:").Append(clientId).Internal();
+    Log->Append("Client ID:").Append(cId).Internal();
     Log->Append("Auth Key:").Append(authKey).Internal();
-    if (isClientAvailable(clientId, authKey))
+    if (isClientAvailable(cId, authKey))
     {
+        clientId = cId;
         return true;
     }
     return false;
@@ -357,5 +389,42 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
         }
     }
     Log->Append("Client not found").Internal();
+    return false;
+}
+
+bool SigmaWsServer::isConnectionLimitReached(String clientId, SigmaWsServer *server, AsyncWebSocketClient *client)
+{
+    uint n = 0;
+
+    for (auto it = server->clients.begin(); it != server->clients.end(); it++)
+    {
+        server->Log->Append("Client# ").Append(it->second.clientId).Internal();
+        if (it->second.clientId == clientId)
+        {
+            server->Log->Append("Client ").Append(clientId).Append(" already connected. checking...").Internal();
+            n++;
+            if (n > server->config.maxConnectionsPerClient)
+            {
+                server->Log->Printf("Client %s already connected. The previous connection will be closed.\n", clientId.c_str()).Error();
+                client->close();
+                server->Log->Append("Client ").Append(clientId).Append(" closed.").Append("Status:").Append(client->status()).Internal();
+                server->clients.erase(it->second.clientIdInt);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool SigmaWsServer::isClientLimitReached(SigmaWsServer *server, AsyncWebSocketClient *client)
+{
+
+    if (server->clients.size() > server->config.maxClients)
+    {
+        server->Log->Printf("Max clients reached").Error();
+        client->close();
+        server->clients.erase(client->id());
+        return true;
+    }
     return false;
 }
