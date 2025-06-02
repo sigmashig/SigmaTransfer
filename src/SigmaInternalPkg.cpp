@@ -39,15 +39,14 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binary
 
 void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
 {
-    // pkgData.protocol = protocol;
     pkgData.topic = topic;
+    pkgData.payload = payload;
     pkgData.isBinary = isBinary;
     pkgData.clientId = clientId;
     pkgData.binaryPayloadLength = binaryPayloadLength;
     pkgData.binaryPayload = binaryPayload;
     JsonDocument doc;
     doc["clientId"] = pkgData.clientId;
-    // doc["protocol"] = pkgData.protocol;
     doc["topic"] = pkgData.topic;
     doc["payload"] = pkgData.payload;
     doc["isBinary"] = pkgData.isBinary;
@@ -66,6 +65,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
     DeserializationError error = deserializeJson(doc, msg);
     if (error)
     {
+        Serial.printf("Error deserializing JSON: %s\n", error.c_str());
         this->isError = true;
         return;
     }
@@ -83,7 +83,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         this->isAllocated = false;
         binaryPayload = nullptr;
     }
-
+    //Serial.printf("payload: %s\n", doc["payload"].as<String>().c_str());
     init(doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
 }
 

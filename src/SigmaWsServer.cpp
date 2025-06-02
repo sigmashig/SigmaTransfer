@@ -264,7 +264,8 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
         {
             SigmaInternalPkg pkg(payload);
-            server->Log->Append("Sending event to protocol(sigma):").Append(server->name).Append("#").Append(pkg.GetTopic()).Internal();
+            server->Log->Append("Sending event to protocol(sigma):").Append(pkg.GetTopic()).Internal();
+            server->Log->Append("PKG:").Append(pkg.GetTopic()).Append("#").Append(pkg.GetPayload()).Append("#").Append(pkg.GetPkgString()).Append("#").Internal();
             esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {

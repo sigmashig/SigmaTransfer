@@ -21,13 +21,7 @@ enum
   EVENT_TEST4 = 0x83,
   EVENT_TEST5 = 0x84
 } MY_EVENT_IDS;
-void TestDelayedMessaging(String protocolName, esp_event_loop_handle_t eventLoop)
-{
-
-  SigmaInternalPkg pkg(protocolName, "delayedTopic1", "Hello, World!");
-  esp_event_post_to(eventLoop, protocolName.c_str(), ESP_EVENT_ANY_ID, &pkg, sizeof(SigmaInternalPkg), portMAX_DELAY);
-}
-
+/*
 void TestMessaging(SigmaProtocol *protocol, esp_event_loop_handle_t eventLoop)
 {
   if (protocol != NULL)
@@ -49,7 +43,7 @@ void TestMessaging(SigmaProtocol *protocol, esp_event_loop_handle_t eventLoop)
     esp_event_post_to(eventLoop, protocol->GetEventBase(), ESP_EVENT_ANY_ID, &pkg2, sizeof(SigmaInternalPkg), portMAX_DELAY);
   }
 }
-
+*/
 void genericEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Generic event").Internal();
@@ -65,7 +59,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
     Log->Append("Protocol is NULL").Internal();
     return;
   }
-  Log->Append("Base:").Append(event_base).Append("#ID: ").Append(event_id).Append(" Protocol: ").Append(protocol->GetName()).Internal();
+  Log->Append("Protocol:").Append(protocol->GetName()).Append(" Base:").Append(event_base).Append("#ID: ").Append(event_id).Internal();
   if (event_id == PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE)
   {
     String pkg = String((char *)event_data);
@@ -73,13 +67,12 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
   }
   else if (event_id == PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE)
   {
-
     Log->Append("PROTOCOL_RAW_BINARY_MESSAGE:[][]").Internal();
   }
   else if (event_id = PROTOCOL_RECEIVED_SIGMA_MESSAGE)
   {
     SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
-    Log->Append("PROTOCOL_MESSAGE:[").Append(pkg.GetTopic()).Append("]:").Append(pkg.GetPayload()).Internal();
+    Log->Append("PROTOCOL_MESSAGE:[").Append(pkg.GetTopic()).Append("]:#").Append(pkg.GetPayload()).Append("#").Internal();
   }
   else if (event_id = PROTOCOL_DISCONNECTED)
   {
