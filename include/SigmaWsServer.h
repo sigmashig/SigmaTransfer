@@ -48,7 +48,7 @@ typedef struct
 class SigmaWsServer : public SigmaProtocol
 {
 public:
-    SigmaWsServer(String name, WSServerConfig config);
+    SigmaWsServer(String name, WSServerConfig config, int priority=5 );
     ~SigmaWsServer();
     void Subscribe(TopicSubscription subscriptionTopic) {};
     void Unsubscribe(String topic) {};
@@ -111,6 +111,8 @@ private:
     inline static QueueHandle_t xQueue;
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     bool shouldConnect = true;
+
+    //esp_event_loop_handle_t protocolLoop;
 
     // inline static AsyncClient wsClient;
     // static void onConnect(void *arg, AsyncClient *c);

@@ -254,7 +254,7 @@ void setup()
   WServer->AddAllowableClient("123", "secret-api-key-12345");
 
   espErr = esp_event_handler_instance_register_with(
-      SigmaProtocol::GetEventLoop(),
+      WServer->GetEventLoop(),
       WServer->GetName().c_str(),
       ESP_EVENT_ANY_ID,
       protocolEventHandler,
@@ -290,24 +290,12 @@ void setup()
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
   Transfer->AddProtocol("MQTT", Mqtt);
 #endif
-  espErr = esp_event_handler_instance_register_with(
-      SigmaProtocol::GetEventLoop(),
-      ESP_EVENT_ANY_BASE,
-      ESP_EVENT_ANY_ID,
-      genericEventHandler,
-      NULL,
-      NULL);
-  if (espErr != ESP_OK)
-  {
-    Log->Printf("Failed to register network event handler: %d", espErr).Internal();
-    exit(1);
-  }
 
   network->Connect();
   delay(1000);
   // ulong loopHandle = (ulong)SigmaProtocol::GetEventLoop();
   // Log->Append("Loop handle:").Append(loopHandle).Internal();
-  esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
+  //esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
 }
 
 void loop()

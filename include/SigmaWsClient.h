@@ -23,8 +23,7 @@ typedef struct
 class SigmaWsClient : public SigmaProtocol
 {
 public:
-    SigmaWsClient(String name, WSClientConfig config);
-    SigmaWsClient();
+    SigmaWsClient(String name, WSClientConfig config, uint priority = 5);
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);
 

@@ -2,10 +2,17 @@
 #include <WiFi.h>
 #include <esp_event.h>
 
-SigmaProtocol::SigmaProtocol()
+SigmaProtocol::SigmaProtocol(String name, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
     //messages = std::list<Message>();
     //queueMutex = xSemaphoreCreateMutex();
+    esp_event_loop_args_t loop_args = {
+        .queue_size = (int32_t)queueSize,
+        .task_name = name.c_str(),
+        .task_priority = priority,
+        .task_stack_size = stackSize,
+        .task_core_id = (int)coreId};
+
     esp_err_t espErr = esp_event_loop_create(&loop_args, &eventLoop);
     if (espErr != ESP_OK)
     {
@@ -17,41 +24,6 @@ SigmaProtocol::SigmaProtocol()
 SigmaProtocol::~SigmaProtocol()
 {
 }
-/*
-esp_err_t SigmaProtocol::PostEvent(int32_t eventId, void *eventData, size_t eventDataSize)
-{
-    if (eventLoop == nullptr)
-    {
-        return esp_event_post(SIGMAPROTOCOL_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
-    }
-    else
-    {
-        return esp_event_post_to(eventLoop, SIGMAPROTOCOL_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
-    }
-}
-*/
-/*
-void SigmaProtocol::Send(String topic, String payload)
-{
-    if (!IsReady())
-    {
-        PLogger->Append("Protocol: ").Append(GetName()).Append(" is not ready").Info();
-        if (xSemaphoreTake(queueMutex, pdMS_TO_TICKS(1000)) == pdTRUE)
-        {
-            Message message;
-            message.protocolName = GetName();
-            message.payload = payload;
-            message.topic = rootTopic + topic;
-            messages.push_back(message);
-            xSemaphoreGive(queueMutex);
-        }
-    }
-    else
-    {
-        send(topic, payload);
-    }
-}
-*/
 bool SigmaProtocol::IsIP(String URL)
 {
     for (int i = 0; i < URL.length(); i++)

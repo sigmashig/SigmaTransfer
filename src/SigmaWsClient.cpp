@@ -5,7 +5,7 @@
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 
-SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config)
+SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config, uint priority) : SigmaProtocol(name, priority)
 {
     config = _config;
     this->name = name;
@@ -22,10 +22,6 @@ SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config)
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
-}
-
-SigmaWsClient::SigmaWsClient()
-{
 }
 
 void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
@@ -306,16 +302,16 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
                         {
                             SigmaInternalPkg pkg(payload);
-                            esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
                             TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
                             if (subscription != nullptr)
                             {
-                                esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                                esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
                             }
                         }
                         else
                         {
-                            esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length(), portMAX_DELAY);
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length(), portMAX_DELAY);
                         }
 
                         break;
@@ -343,7 +339,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                             // memcpy(payload, bytes + headerLen, payload_len);
                         }
                         BinaryData *bd = (BinaryData *)payload;
-                        esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
                         if (isFreeRequired)
                         {
                             free(payload);
@@ -363,7 +359,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     {
                         // Ping frame.
                         ws->PLogger->Append("Received ping frame").Internal();
-                        esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PING, data, len, portMAX_DELAY);
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PING, data, len, portMAX_DELAY);
                         // TODO: ws->SendWebSocketFramePong(""); // Pong
                         break;
                     }
@@ -371,7 +367,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     {
                         // Pong frame
                         ws->PLogger->Append("Received pong frame").Internal();
-                        esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PONG, data, len, portMAX_DELAY);
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PONG, data, len, portMAX_DELAY);
                         // TODO: ws->SendWebSocketFramePong(""); // Pong
                         break;
                     }
@@ -388,7 +384,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             {
                 ws->PLogger->Append("WebSocket handshake failed").Internal();
                 String error = "[" + ws->GetName() + "] " + "WebSocket handshake failed";
-                esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length(), portMAX_DELAY);
+                esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length(), portMAX_DELAY);
             }
         }
     }
@@ -399,7 +395,7 @@ void SigmaWsClient::onError(void *arg, AsyncClient *c, int8_t error)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP error: " + error;
     ws->PLogger->Append(errorStr).Internal();
-    esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
 }
 
 void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
@@ -407,7 +403,7 @@ void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP timeout after " + String(time) + "ms";
     ws->PLogger->Append(errorStr).Internal();
-    esp_event_post_to(SigmaProtocol::GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
     //    c->close();
 }
 

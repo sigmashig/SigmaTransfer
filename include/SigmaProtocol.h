@@ -8,6 +8,7 @@
 #include <esp_event.h>
 #include <SigmaAsyncNetwork.h>
 // ESP_EVENT_DEFINE_BASE(SIGMAPROTOCOL_EVENT);
+
 typedef struct
 {
     String topic;
@@ -39,7 +40,7 @@ enum AuthType
 class SigmaProtocol
 {
 public:
-    SigmaProtocol();
+    SigmaProtocol(String name, uint priority = 5, uint queueSize = 100, uint stackSize = 4096, uint coreId = 1);
     ~SigmaProtocol();
     virtual void Subscribe(TopicSubscription subscriptionTopic) = 0;
     virtual void Subscribe(String topic)
@@ -58,11 +59,12 @@ public:
     virtual bool IsNetworkRequired() { return isNetworkRequired; };
     static bool IsIP(String URL);
     virtual void SetClientId(String id) { clientId = id; };
-    static esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
+    virtual esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
     virtual String GetClientId() { return clientId; };
     virtual String GetName() { return name; };
 
 protected:
+
     SigmaLoger *PLogger = new SigmaLoger(512);
     bool isNetworkRequired = false;
     String rootTopic = "/";
@@ -75,15 +77,10 @@ protected:
     void removeSubscription(String topic);
     String clientId;
     String name;
+    //esp_event_loop_handle_t* createEventLoop(esp_event_loop_handle_t* eventLoop, String name, uint priority=5, uint queueSize=100, uint stackSize=4096, uint coreId=1);
+    esp_event_loop_handle_t eventLoop;
 
-private:
-    const esp_event_loop_args_t loop_args = {
-        .queue_size = 100,
-        .task_name = "ProtocolEventLoop",
-        .task_priority = 5, // priority must be lower the network loop
-        .task_stack_size = 4096,
-        .task_core_id = 1};
-    inline static esp_event_loop_handle_t eventLoop;
+private : 
 };
 
 #endif

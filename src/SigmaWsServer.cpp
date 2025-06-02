@@ -5,7 +5,7 @@
 #include <esp_event.h>
 #include <ArduinoJson.h>
 
-SigmaWsServer::SigmaWsServer(String name, WSServerConfig config)
+SigmaWsServer::SigmaWsServer(String name, WSServerConfig config, int priority) : SigmaProtocol(name, priority)
 {
     this->name = name;
     this->config = config;
@@ -13,6 +13,8 @@ SigmaWsServer::SigmaWsServer(String name, WSServerConfig config)
 
     xQueue = xQueueCreate(10, sizeof(SigmaWsServerData));
     xTaskCreate(processData, "ProcessData", 4096, this, 1, NULL);
+
+    
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
@@ -220,7 +222,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             // Client MUST BE AUTHENTICATED before sending binary data
             // there is no check of auth attribute for AUTH_TYPE_ALL_MESSAGES
             SigmaInternalPkg pkg("", data.data, data.len, true, auth->clientId);
-            esp_event_post_to(GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length(), portMAX_DELAY);
+            esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length(), portMAX_DELAY);
         }
         else
         {
@@ -249,10 +251,8 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             }
         }
         server->Log->Append("Sending event to protocol(raw):").Append(server->name).Append("#").Append(payload).Internal();
-        ulong loopHandle = (ulong)GetEventLoop();
-        server->Log->Append("Loop handle():").Append(loopHandle).Internal();
-
-        esp_err_t espErr = esp_event_post_to(GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
+        
+        esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
         if (espErr != ESP_OK)
         {
             server->Log->Printf("Failed to send event(raw) to protocol: %d", espErr).Error();
@@ -260,7 +260,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
         {
             SigmaInternalPkg pkg(payload);
-            esp_err_t espErr = esp_event_post_to(SigmaProtocol::GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
+            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {
                 server->Log->Printf("Failed to send event to protocol: %d", espErr).Error();
@@ -268,7 +268,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             auto subscription = server->subscriptions.find(pkg.GetTopic());
             if (subscription != server->subscriptions.end())
             {
-                esp_event_post_to(SigmaProtocol::GetEventLoop(), server->name.c_str(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
+                esp_event_post_to(server->GetEventLoop(), server->name.c_str(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
             }
         }
         server->Log->Append("DATA HANDLED").Internal();
