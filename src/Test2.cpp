@@ -10,6 +10,9 @@
 #define PROTO_UART 0
 #define PROTO_WS_CLIENT 0
 #define PROTO_WS_SERVER 1
+
+SigmaLoger *Log;
+
 enum
 {
   EVENT_TEST1 = 0x80,
@@ -39,11 +42,11 @@ void TestMessaging(SigmaProtocol *protocol, esp_event_loop_handle_t eventLoop)
     subscription.isReSubscribe = true;
     protocol->Subscribe(subscription);
 
-    SigmaInternalPkg pkg(protocol->GetName(), "testTopic1", "Hello, World!");
-    esp_event_post_to(eventLoop, protocol->GetName().c_str(), ESP_EVENT_ANY_ID, &pkg, sizeof(SigmaInternalPkg), portMAX_DELAY);
+    SigmaInternalPkg pkg("testTopic1", "Hello, World!");
+    esp_event_post_to(eventLoop, protocol->GetEventBase(), ESP_EVENT_ANY_ID, &pkg, sizeof(SigmaInternalPkg), portMAX_DELAY);
 
-    SigmaInternalPkg pkg2(protocol->GetName(), "testTopic2", "Hello, World!");
-    esp_event_post_to(eventLoop, protocol->GetName().c_str(), ESP_EVENT_ANY_ID, &pkg2, sizeof(SigmaInternalPkg), portMAX_DELAY);
+    SigmaInternalPkg pkg2("testTopic2", "Hello, World!");
+    esp_event_post_to(eventLoop, protocol->GetEventBase(), ESP_EVENT_ANY_ID, &pkg2, sizeof(SigmaInternalPkg), portMAX_DELAY);
   }
 }
 
@@ -199,7 +202,7 @@ void setup()
   WiFiConfigSta wifiConfig;
   wifiConfig.ssid = "Sigma";
   wifiConfig.password = "kybwynyd";
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(wifiConfig);
+  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(wifiConfig, Log);
   espErr = esp_event_handler_instance_register_with(
       SigmaAsyncNetwork::GetEventLoop(),
       "network",
@@ -212,7 +215,6 @@ void setup()
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
     exit(1);
   }
-
 #if PROTO_WS_CLIENT == 1
   {
     WSClientConfig wsConfig;
@@ -251,13 +253,12 @@ void setup()
   wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
   wsServerConfig.maxClients = 10;
   wsServerConfig.maxConnectionsPerClient = 1;
-  SigmaWsServer *WServer = new SigmaWsServer("WSserver", wsServerConfig);
+  SigmaWsServer *WServer = new SigmaWsServer("WSserver", Log, wsServerConfig);
   protocol = WServer;
   WServer->AddAllowableClient("W123", "secret-api-key-12345");
-
   espErr = esp_event_handler_instance_register_with(
       WServer->GetEventLoop(),
-      WServer->GetName().c_str(),
+      WServer->GetEventBase(), // ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       protocolEventHandler,
       WServer,
@@ -297,7 +298,7 @@ void setup()
   delay(1000);
   // ulong loopHandle = (ulong)SigmaProtocol::GetEventLoop();
   // Log->Append("Loop handle:").Append(loopHandle).Internal();
-  //esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
+  // esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
 }
 
 void loop()

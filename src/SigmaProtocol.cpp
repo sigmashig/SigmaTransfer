@@ -2,8 +2,9 @@
 #include <WiFi.h>
 #include <esp_event.h>
 
-SigmaProtocol::SigmaProtocol(String name, uint priority, uint queueSize, uint stackSize, uint coreId)
+SigmaProtocol::SigmaProtocol(String name, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
+    this->Log = (logger != nullptr) ? logger : new SigmaLoger(0);
     //messages = std::list<Message>();
     //queueMutex = xSemaphoreCreateMutex();
     esp_event_loop_args_t loop_args = {
@@ -23,7 +24,9 @@ SigmaProtocol::SigmaProtocol(String name, uint priority, uint queueSize, uint st
 
 SigmaProtocol::~SigmaProtocol()
 {
+    esp_event_loop_delete(eventLoop);
 }
+
 bool SigmaProtocol::IsIP(String URL)
 {
     for (int i = 0; i < URL.length(); i++)

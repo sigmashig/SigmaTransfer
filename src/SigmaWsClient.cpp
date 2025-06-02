@@ -5,7 +5,7 @@
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 
-SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config, uint priority) : SigmaProtocol(name, priority)
+SigmaWsClient::SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig _config, uint priority) : SigmaProtocol(name, logger, priority)
 {
     config = _config;
     this->name = name;
@@ -17,11 +17,11 @@ SigmaWsClient::SigmaWsClient(String name, WSClientConfig _config, uint priority)
     wsClient.onTimeout(onTimeout, this);
 
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
+    //esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PONG, protocolEventHandler, this);
 }
 
 void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
@@ -83,10 +83,10 @@ void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, 
 
 void SigmaWsClient::Connect()
 {
-    PLogger->Internal("WS connecting");
+    Log->Internal("WS connecting");
     if (!SigmaAsyncNetwork::IsConnected())
     {
-        PLogger->Internal("WS cannot connect - network is not connected");
+        Log->Internal("WS cannot connect - network is not connected");
         return;
     }
     String url = config.host;
@@ -107,7 +107,7 @@ void SigmaWsClient::Disconnect()
 void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
-    ws->PLogger->Internal("TCP connected");
+    ws->Log->Internal("TCP connected");
 
     // Generate WebSocket key - random 16 bytes base64 encoded
     byte randomKey[16];
@@ -155,17 +155,17 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     }
     handshake += "\r\n";
 
-    ws->PLogger->Append("Sending handshake:").Append(handshake).Internal();
+    ws->Log->Append("Sending handshake:").Append(handshake).Internal();
 
     // Send handshake
     wsClient.add(handshake.c_str(), handshake.length());
     if (wsClient.send())
     {
-        ws->PLogger->Append("Sent WebSocket handshake").Internal();
+        ws->Log->Append("Sent WebSocket handshake").Internal();
     }
     else
     {
-        ws->PLogger->Append("Failed to send WebSocket handshake").Internal();
+        ws->Log->Append("Failed to send WebSocket handshake").Internal();
     }
     if (ws->config.authType != AUTH_TYPE_FIRST_MESSAGE)
     {
@@ -176,8 +176,8 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 void SigmaWsClient::setReady(bool ready)
 {
     isReady = ready;
-    PLogger->Append("Setting ready to ").Append(ready).Internal();
-    esp_event_post_to(SigmaProtocol::GetEventLoop(), GetName().c_str(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
+    Log->Append("Setting ready to ").Append(ready).Internal();
+    esp_event_post_to(SigmaProtocol::GetEventLoop(), GetEventBase(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
 }
 
 void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
@@ -191,17 +191,17 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     char *buf = (char *)data;
     String response = String(buf, len);
-    ws->PLogger->Append("Received data from WebSocket server").Internal();
-    ws->PLogger->Append(response).Internal();
-    ws->PLogger->Append("**************************************************").Internal();
+    ws->Log->Append("Received data from WebSocket server").Internal();
+    ws->Log->Append(response).Internal();
+    ws->Log->Append("**************************************************").Internal();
 
     if (response.indexOf("HTTP/1.1 101") >= 0 &&
         response.indexOf("Upgrade: websocket") >= 0)
     {
-        ws->PLogger->Append("WebSocket handshake successful").Internal();
+        ws->Log->Append("WebSocket handshake successful").Internal();
         if (!ws->isReady && ws->config.authType & (AUTH_TYPE_FIRST_MESSAGE))
         {
-            ws->PLogger->Append("Sending auth message").Internal();
+            ws->Log->Append("Sending auth message").Internal();
             JsonDocument doc;
             doc["type"] = "auth";
             doc["apiKey"] = ws->config.apiKey;
@@ -214,14 +214,14 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             }
             else
             {
-                ws->PLogger->Append("Failed to send auth message").Internal();
+                ws->Log->Append("Failed to send auth message").Internal();
                 ws->setReady(false);
             }
         }
         else
         {
             // Parse WebSocket frame
-            ws->PLogger->Append("Received data from WebSocket server").Internal();
+            ws->Log->Append("Received data from WebSocket server").Internal();
             byte *bytes = (byte *)data;
             byte opcode = bytes[0] & 0x0F;
             bool masked = (bytes[1] & 0x80) != 0;
@@ -285,14 +285,14 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                             payload = String((char *)(bytes + headerLen), payload_len);
                         }
 
-                        ws->PLogger->Append("Received: ").Append(payload).Internal();
+                        ws->Log->Append("Received: ").Append(payload).Internal();
                         if (ws->config.authType & AUTH_TYPE_ALL_MESSAGES)
                         {
                             JsonDocument doc;
                             deserializeJson(doc, payload);
                             if (doc["authKey"] == nullptr || doc["authKey"] != ws->config.apiKey || doc["data"] == nullptr)
                             {
-                                ws->PLogger->Append("Received message with invalid auth key or empty structure").Internal();
+                                ws->Log->Append("Received message with invalid auth key or empty structure").Internal();
                                 return;
                             }
 
@@ -302,16 +302,16 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
                         {
                             SigmaInternalPkg pkg(payload);
-                            esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
                             TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
                             if (subscription != nullptr)
                             {
-                                esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                                esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
                             }
                         }
                         else
                         {
-                            esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length(), portMAX_DELAY);
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length(), portMAX_DELAY);
                         }
 
                         break;
@@ -339,7 +339,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                             // memcpy(payload, bytes + headerLen, payload_len);
                         }
                         BinaryData *bd = (BinaryData *)payload;
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
                         if (isFreeRequired)
                         {
                             free(payload);
@@ -349,7 +349,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     case 0x08:
                     {
                         // Close frame. Server is closing the connection. We will try to reconnect
-                        ws->PLogger->Append("Received close frame").Internal();
+                        ws->Log->Append("Received close frame").Internal();
                         ws->Disconnect();
                         // ws->setReady(false);
                         ws->Connect();
@@ -358,23 +358,23 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     case 0x09:
                     {
                         // Ping frame.
-                        ws->PLogger->Append("Received ping frame").Internal();
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PING, data, len, portMAX_DELAY);
+                        ws->Log->Append("Received ping frame").Internal();
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING, data, len, portMAX_DELAY);
                         // TODO: ws->SendWebSocketFramePong(""); // Pong
                         break;
                     }
                     case 0x0A:
                     {
                         // Pong frame
-                        ws->PLogger->Append("Received pong frame").Internal();
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_RECEIVED_PONG, data, len, portMAX_DELAY);
+                        ws->Log->Append("Received pong frame").Internal();
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG, data, len, portMAX_DELAY);
                         // TODO: ws->SendWebSocketFramePong(""); // Pong
                         break;
                     }
                     default:
                     {
                         // Unknown frame
-                        ws->PLogger->Append("Unknown frame").Internal();
+                        ws->Log->Append("Unknown frame").Internal();
                         break;
                     }
                     }
@@ -382,9 +382,9 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             }
             else
             {
-                ws->PLogger->Append("WebSocket handshake failed").Internal();
+                ws->Log->Append("WebSocket handshake failed").Internal();
                 String error = "[" + ws->GetName() + "] " + "WebSocket handshake failed";
-                esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length(), portMAX_DELAY);
+                esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length(), portMAX_DELAY);
             }
         }
     }
@@ -394,16 +394,16 @@ void SigmaWsClient::onError(void *arg, AsyncClient *c, int8_t error)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP error: " + error;
-    ws->PLogger->Append(errorStr).Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    ws->Log->Append(errorStr).Internal();
+    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
 }
 
 void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP timeout after " + String(time) + "ms";
-    ws->PLogger->Append(errorStr).Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetName().c_str(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    ws->Log->Append(errorStr).Internal();
+    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
     //    c->close();
 }
 
@@ -436,7 +436,7 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
 {
     if (!isReady && !isAuth)
     {
-        PLogger->Append("Cannot send message - not connected").Internal();
+        Log->Append("Cannot send message - not connected").Internal();
         return false;
     }
 

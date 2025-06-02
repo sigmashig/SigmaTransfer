@@ -28,6 +28,7 @@ typedef struct
     byte *data;
     size_t size;
 } BinaryData;
+
 enum AuthType
 {
     AUTH_TYPE_NONE = 0,
@@ -40,7 +41,7 @@ enum AuthType
 class SigmaProtocol
 {
 public:
-    SigmaProtocol(String name, uint priority = 5, uint queueSize = 100, uint stackSize = 4096, uint coreId = 1);
+    SigmaProtocol(String name, SigmaLoger *logger = nullptr, uint priority = 5, uint queueSize = 100, uint stackSize = 4096, uint coreId = 1);
     ~SigmaProtocol();
     virtual void Subscribe(TopicSubscription subscriptionTopic) = 0;
     virtual void Subscribe(String topic)
@@ -52,33 +53,33 @@ public:
     virtual void Unsubscribe(String topic) = 0;
     virtual void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
+    //virtual bool IsNetworkRequired() { return isNetworkRequired; };
+    static bool IsIP(String URL);
+    virtual esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
+    virtual esp_event_base_t GetEventBase() { return eventBase; };
+    virtual String GetName() { return name; };
+
+protected:
+    
+    esp_event_base_t eventBase = "SigmaProtocol";
+    //bool isNetworkRequired = false;
+    String rootTopic = "/";
+    bool isReady = false;
+    std::map<String, TopicSubscription> subscriptions;
+    String clientId;
+    String name;
+    esp_event_loop_handle_t eventLoop;
+    SigmaLoger *Log;
+
     virtual void Disconnect() = 0;
     virtual void Close() = 0;
     virtual void Connect() = 0;
     virtual bool IsReady() { return isReady; };
-    virtual bool IsNetworkRequired() { return isNetworkRequired; };
-    static bool IsIP(String URL);
-    virtual void SetClientId(String id) { clientId = id; };
-    virtual esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
-    virtual String GetClientId() { return clientId; };
-    virtual String GetName() { return name; };
-
-protected:
-
-    SigmaLoger *PLogger = new SigmaLoger(512);
-    bool isNetworkRequired = false;
-    String rootTopic = "/";
-    bool isReady = false;
     virtual void setReady(bool ready) = 0;
     void setRootTopic(String rootTopic) { this->rootTopic = rootTopic; };
-    std::map<String, TopicSubscription> subscriptions;
     TopicSubscription *GetSubscription(String topic);
     void addSubscription(TopicSubscription subscription);
     void removeSubscription(String topic);
-    String clientId;
-    String name;
-    //esp_event_loop_handle_t* createEventLoop(esp_event_loop_handle_t* eventLoop, String name, uint priority=5, uint queueSize=100, uint stackSize=4096, uint coreId=1);
-    esp_event_loop_handle_t eventLoop;
 
 private : 
 };

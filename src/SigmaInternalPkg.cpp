@@ -7,7 +7,7 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, bool isBinary, 
 {
     int length;
     byte *binaryPayload = nullptr;
-   
+
     if (isBinary)
     { // the payload contains an encoded binary
         length = GetDecodedLength(payload.length());
@@ -21,11 +21,9 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, bool isBinary, 
         length = payload.length();
         binaryPayload = nullptr;
     }
-    
+
     init(topic, payload, isBinary, clientId, binaryPayload, length);
 }
-
-
 
 SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary, String clientId)
 {
@@ -41,7 +39,7 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binary
 
 void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
 {
-    //pkgData.protocol = protocol;
+    // pkgData.protocol = protocol;
     pkgData.topic = topic;
     pkgData.isBinary = isBinary;
     pkgData.clientId = clientId;
@@ -49,7 +47,7 @@ void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String 
     pkgData.binaryPayload = binaryPayload;
     JsonDocument doc;
     doc["clientId"] = pkgData.clientId;
-    //doc["protocol"] = pkgData.protocol;
+    // doc["protocol"] = pkgData.protocol;
     doc["topic"] = pkgData.topic;
     doc["payload"] = pkgData.payload;
     doc["isBinary"] = pkgData.isBinary;
@@ -86,10 +84,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         binaryPayload = nullptr;
     }
 
-
-
     init(doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
-    
 }
 
 SigmaInternalPkg::~SigmaInternalPkg()
@@ -109,28 +104,17 @@ bool SigmaInternalPkg::IsSigmaInternalPkg(const String &msg)
         Serial.printf("Error deserializing JSON: %s\n", error.c_str());
         return false;
     }
-    //if (!doc["protocol"].is<String>())
-    //{
-    //    return false;
-    //}
     if (!doc["topic"].is<String>())
     {
-        Serial.println("topic not found");
+        //    Serial.println("topic not found");
         return false;
     }
     if (!doc["payload"].is<String>())
     {
-        Serial.println("payload not found");
+        //    Serial.println("payload not found");
         return false;
     }
-    //if (!doc["isBinary"].is<bool>())
-    //{
-    //    return false;
-    //}
-    //if (!doc["length"].is<int>())
-    //{
-    //    return false;
-    //}
+
     return true;
 }
 

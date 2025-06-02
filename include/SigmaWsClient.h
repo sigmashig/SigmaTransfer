@@ -23,20 +23,19 @@ typedef struct
 class SigmaWsClient : public SigmaProtocol
 {
 public:
-    SigmaWsClient(String name, WSClientConfig config, uint priority = 5);
+    SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig config, uint priority = 5);
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);
 
+private:
     void Connect();
     void Disconnect();
-    bool IsNetworkRequired() { return true; };
     void Close()
     {
         shouldConnect = false;
         Disconnect();
     };
 
-private:
     WSClientConfig config;
 
     inline static std::map<String, TopicSubscription> eventMap;

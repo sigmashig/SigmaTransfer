@@ -47,7 +47,7 @@ typedef struct
 class SigmaAsyncNetwork
 {
 public:
-    SigmaAsyncNetwork(WiFiConfigSta config);
+    SigmaAsyncNetwork(WiFiConfigSta config, SigmaLoger *log);
     ~SigmaAsyncNetwork();
     void Connect();
     void Disconnect();
@@ -55,7 +55,7 @@ public:
     static esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
 
 private:
-    SigmaLoger *Log = new SigmaLoger(512);
+    SigmaLoger *Log;
     inline static WiFiConfigSta configWiFi;
     inline static bool isConnected = false;
     bool shouldConnect = true;

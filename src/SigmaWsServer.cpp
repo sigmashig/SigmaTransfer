@@ -5,10 +5,10 @@
 #include <esp_event.h>
 #include <ArduinoJson.h>
 
-SigmaWsServer::SigmaWsServer(String name, WSServerConfig config, int priority) : SigmaProtocol(name, priority)
+SigmaWsServer::SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority) : SigmaProtocol(name, logger, priority)
 {
-    this->name = name;
     this->config = config;
+    this->name = name;
     isReady = false;
 
     xQueue = xQueueCreate(10, sizeof(SigmaWsServerData));
@@ -17,9 +17,9 @@ SigmaWsServer::SigmaWsServer(String name, WSServerConfig config, int priority) :
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PING, protocolEventHandler, this);
-    esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
+    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
+    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PING, protocolEventHandler, this);
+    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 
     server = new AsyncWebServer(config.port);
     ws = new AsyncWebSocket(config.rootPath);
@@ -40,7 +40,6 @@ SigmaWsServer::~SigmaWsServer()
 
 void SigmaWsServer::Connect()
 {
-    Log->Append("SigmaWsServer Connect").Internal();
     if (!shouldConnect)
     {
         return;
@@ -140,7 +139,6 @@ void SigmaWsServer::processData(void *arg)
         SigmaWsServerData data;
         if (xQueueReceive(server->xQueue, &data, portMAX_DELAY) == pdPASS)
         {
-            server->Log->Append("Received data from queue:").Append(data.type).Internal();
             switch (data.type)
             {
             case WS_EVT_CONNECT:
@@ -150,7 +148,7 @@ void SigmaWsServer::processData(void *arg)
                 {
                     return;
                 }
-                
+
                 ClientAuth auth;
                 auth.clientId = "";
                 auth.clientIdInt = data.wsClient->id();
@@ -202,7 +200,6 @@ void SigmaWsServer::processData(void *arg)
             }
             case WS_EVT_DATA:
             {
-                server->Log->Append("WS_EVT_DATA").Internal();
                 handleWebSocketMessage(server, data);
                 break;
             }
@@ -221,23 +218,15 @@ void SigmaWsServer::processData(void *arg)
 void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data)
 {
     ClientAuth *auth = &(server->clients[data.wsClient->id()]);
-    /*
-    if (data.wsClient->status() == WS_DISCONNECTED || data.wsClient->status() == WS_DISCONNECTING)
-    {
-        server->Log->Append("Client ").Append(auth->clientId).Append(" closed.").Append("Status:").Append(data.wsClient->status()).Internal();
-        return;
-    }
-    */
     server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->isAuth).Internal();
     if (data.frameInfo->opcode == WS_BINARY)
     {
-        server->Log->Append("WS_BINARY").Internal();
         if (auth->isAuth || server->config.authType == AUTH_TYPE_NONE)
         { // Binary format is available for authenticated clients (URL/FIRST MESSAGE) or no auth
             // Client MUST BE AUTHENTICATED before sending binary data
             // there is no check of auth attribute for AUTH_TYPE_ALL_MESSAGES
             SigmaInternalPkg pkg("", data.data, data.len, true, auth->clientId);
-            esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length(), portMAX_DELAY);
+            esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length(), portMAX_DELAY);
         }
         else
         {
@@ -248,7 +237,6 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
     }
     else if (data.frameInfo->opcode == WS_TEXT)
     {
-        server->Log->Append("WS_TEXT").Internal();
         String payload = String((char *)data.data);
         server->Log->Append("Payload: ").Append(payload).Internal();
         if ((!auth->isAuth && server->config.authType == AUTH_TYPE_FIRST_MESSAGE) || server->config.authType == AUTH_TYPE_ALL_MESSAGES)
@@ -272,18 +260,12 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
                 return;
             }
         }
-        server->Log->Append("Client status").Append(data.wsClient->status()).Internal();
 
-        // esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
-        // if (espErr != ESP_OK)
-        //{
-        //     server->Log->Printf("Failed to send event(raw) to protocol: %d", espErr).Error();
-        // }
         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
         {
             SigmaInternalPkg pkg(payload);
             server->Log->Append("Sending event to protocol(sigma):").Append(server->name).Append("#").Append(pkg.GetTopic()).Internal();
-            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {
                 server->Log->Printf("Failed to send event to protocol: %d", espErr).Error();
@@ -292,17 +274,18 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             if (subscription != server->subscriptions.end())
             {
                 server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
-                esp_event_post_to(server->GetEventLoop(), server->name.c_str(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+                esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             }
-        } else {
+        }
+        else
+        {
             server->Log->Append("Sending RAW event:").Append(payload).Internal();
-            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->name.c_str(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+            esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {
                 server->Log->Printf("Failed to send event to protocol: %d", espErr).Error();
             }
         }
-        server->Log->Append("DATA HANDLED").Internal();
     }
     else
     {
@@ -352,7 +335,7 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
 
 bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
 {
-    Log->Append("Client auth request:").Append(payload).Internal();
+    // Log->Append("Client auth request:").Append(payload).Internal();
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
     if (error)
@@ -362,8 +345,8 @@ bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
     }
     String cId = doc["clientId"].as<String>();
     String authKey = doc["authKey"].as<String>();
-    Log->Append("Client ID:").Append(cId).Internal();
-    Log->Append("Auth Key:").Append(authKey).Internal();
+    // Log->Append("Client ID:").Append(cId).Internal();
+    // Log->Append("Auth Key:").Append(authKey).Internal();
     if (isClientAvailable(cId, authKey))
     {
         clientId = cId;
@@ -374,7 +357,7 @@ bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
 
 bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 {
-    Log->Append("Checking if client is available:").Append(clientId).Append("#").Append(authKey).Append("#").Internal();
+    // Log->Append("Checking if client is available:").Append(clientId).Append("#").Append(authKey).Append("#").Internal();
     if (allowableClients.find(clientId) != allowableClients.end())
     {
         if (allowableClients[clientId].authKey == authKey)
@@ -398,16 +381,13 @@ bool SigmaWsServer::isConnectionLimitReached(String clientId, SigmaWsServer *ser
 
     for (auto it = server->clients.begin(); it != server->clients.end(); it++)
     {
-        server->Log->Append("Client# ").Append(it->second.clientId).Internal();
         if (it->second.clientId == clientId)
         {
-            server->Log->Append("Client ").Append(clientId).Append(" already connected. checking...").Internal();
             n++;
             if (n > server->config.maxConnectionsPerClient)
             {
-                server->Log->Printf("Client %s already connected. The previous connection will be closed.\n", clientId.c_str()).Error();
+                server->Log->Printf("Client %s already connected. The previous connection is closed.\n", clientId.c_str()).Error();
                 client->close();
-                server->Log->Append("Client ").Append(clientId).Append(" closed.").Append("Status:").Append(client->status()).Internal();
                 server->clients.erase(it->second.clientIdInt);
                 return true;
             }

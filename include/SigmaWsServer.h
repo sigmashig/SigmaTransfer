@@ -50,16 +50,12 @@ typedef struct
 class SigmaWsServer : public SigmaProtocol
 {
 public:
-    SigmaWsServer(String name, WSServerConfig config, int priority=5 );
+    SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority=5 );
     ~SigmaWsServer();
     void Subscribe(TopicSubscription subscriptionTopic) {};
     void Unsubscribe(String topic) {};
 
-    void Connect();
-    void Disconnect();
-    bool IsNetworkRequired() { return true; };
-    void Close();
-
+  
     void AddAllowableClient(String clientId, String authKey)
     {
         AllowableClients client;
@@ -117,24 +113,11 @@ private:
     inline static QueueHandle_t xQueue;
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     bool shouldConnect = true;
+    void Connect();
+    void Disconnect();
+    //bool IsNetworkRequired() { return true; };
+    void Close();
 
-    //esp_event_loop_handle_t protocolLoop;
-
-    // inline static AsyncClient wsClient;
-    // static void onConnect(void *arg, AsyncClient *c);
-    // static void onDisconnect(void *arg, AsyncClient *c);
-    // static void onData(void *arg, AsyncClient *c, void *data, size_t len);
-    // static void onError(void *arg, AsyncClient *c, int8_t error);
-    // static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
-    // bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
-    // void setReady(bool ready);
-    // static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    // static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    // bool sendWebSocketTextFrame(const String &payload, bool isAuth = false);
-    // bool sendWebSocketBinaryFrame(const byte *data, size_t size);
-    // bool sendWebSocketPingFrame(const String &payload);
-    // bool sendWebSocketPongFrame(const String &payload);
-    // bool sendWebSocketCloseFrame();
 };
 
 #endif

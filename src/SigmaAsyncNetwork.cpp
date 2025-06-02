@@ -2,8 +2,9 @@
 #include "WiFi.h"
 
 ESP_EVENT_DEFINE_BASE(SIGMAASYNCNETWORK_EVENT);
-SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config) : mode(SIGMAASYNCNETWORK_MODE_STA)
+SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config, SigmaLoger *log) : mode(SIGMAASYNCNETWORK_MODE_STA)
 {
+    Log = log != nullptr ? log : new SigmaLoger(0);
     configWiFi = config;
     Log->Append("Configuring WiFi network: ").Append(configWiFi.ssid).Info();
     wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
@@ -29,7 +30,7 @@ SigmaAsyncNetwork::~SigmaAsyncNetwork()
 
 void SigmaAsyncNetwork::reconnectWiFiSta(TimerHandle_t xTimer)
 {
-    //startWiFiSta();
+    // startWiFiSta();
     WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
 }
 void SigmaAsyncNetwork::Connect()
@@ -63,9 +64,10 @@ void SigmaAsyncNetwork::startWiFiSta()
         }
         case SYSTEM_EVENT_STA_DISCONNECTED:
         {
-            Log->Append("WiFi disconnected").Error();
-            Log->Append("WiFi connection error:").Append(info.wifi_sta_disconnected.reason).Error();
-            postEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason));
+            if (isConnected) {
+                Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
+                postEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason));
+            }
             isConnected = false;
             if (shouldConnect) {
                 xTimerStart(wifiStaReconnectTimer, portMAX_DELAY);
