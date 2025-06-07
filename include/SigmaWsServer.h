@@ -50,12 +50,11 @@ typedef struct
 class SigmaWsServer : public SigmaProtocol
 {
 public:
-    SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority=5 );
+    SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority = 5);
     ~SigmaWsServer();
-    void Subscribe(TopicSubscription subscriptionTopic) {};
-    void Unsubscribe(String topic) {};
+    // void Subscribe(TopicSubscription subscriptionTopic) {};
+    // void Unsubscribe(String topic) {};
 
-  
     void AddAllowableClient(String clientId, String authKey)
     {
         AllowableClients client;
@@ -89,7 +88,7 @@ public:
     void setReady(bool ready) { isReady = ready; };
 
 private:
-    SigmaLoger *Log = new SigmaLoger(512);
+    // SigmaLoger *Log = new SigmaLoger(512);
     WSServerConfig config;
 
     std::map<String, TopicSubscription> eventMap;
@@ -115,9 +114,8 @@ private:
     bool shouldConnect = true;
     void Connect();
     void Disconnect();
-    //bool IsNetworkRequired() { return true; };
+    // bool IsNetworkRequired() { return true; };
     void Close();
-
 };
 
 #endif

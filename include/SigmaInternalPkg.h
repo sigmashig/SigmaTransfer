@@ -38,8 +38,8 @@ public:
 
     // prepare for deserialize
     // msg is the message received from the Sigma protocol JSON format
-    SigmaInternalPkg(const char *msg);
-    SigmaInternalPkg(const String &msg) : SigmaInternalPkg(msg.c_str()) {};
+    SigmaInternalPkg(const char *json);
+    SigmaInternalPkg(const String &json) : SigmaInternalPkg(json.c_str()) {};
     // copy constructor
     //SigmaInternalPkg(SigmaInternalStruct pkg) : SigmaInternalPkg(pkg.protocol, pkg.topic, pkg.payload, pkg.isBinary, pkg.clientId) {};
 

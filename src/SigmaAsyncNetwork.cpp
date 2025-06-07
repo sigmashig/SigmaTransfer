@@ -15,7 +15,6 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config, SigmaLoger *log) : mo
         .task_stack_size = 4096,
         .task_core_id = 0};
     esp_err_t espErr = ESP_OK;
-
     espErr = esp_event_loop_create(&loop_args, &eventLoop);
     if (espErr != ESP_OK)
     {
@@ -44,6 +43,7 @@ void SigmaAsyncNetwork::Connect()
 
 esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
+    //Log->Append("postEvent:").Append(eventId).Internal();
     return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
 }
 void SigmaAsyncNetwork::startWiFiSta()
@@ -66,7 +66,7 @@ void SigmaAsyncNetwork::startWiFiSta()
         {
             if (isConnected) {
                 Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
-                postEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason));
+                postEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
             }
             isConnected = false;
             if (shouldConnect) {

@@ -17,23 +17,11 @@ SigmaWsClient::SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig _co
     wsClient.onTimeout(onTimeout, this);
 
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
-    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    //esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
-    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PONG, protocolEventHandler, this);
-}
-
-void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
-{
-    addSubscription(subscriptionTopic);
-    // Nothing todo here
-}
-
-void SigmaWsClient::Unsubscribe(String topic)
-{
-    removeSubscription(topic);
-    // Nothing todo here
+    esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
+    // esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 }
 
 void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -92,7 +80,7 @@ void SigmaWsClient::Connect()
     String url = config.host;
     if (config.authType & AUTH_TYPE_URL)
     {
-        url += "?apiKey=" + config.apiKey;
+        url += "?apiKey=" + config.apiKey + "&clientId=" + config.clientId;
     }
     wsClient.connect(url.c_str(), config.port);
 }
@@ -101,13 +89,12 @@ void SigmaWsClient::Disconnect()
 {
     sendWebSocketCloseFrame();
     wsClient.close();
-    Connect();
 }
 
 void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
-    ws->Log->Internal("TCP connected");
+    ws->Log->Internal("Websocket connected");
 
     // Generate WebSocket key - random 16 bytes base64 encoded
     byte randomKey[16];
@@ -155,7 +142,7 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     }
     handshake += "\r\n";
 
-    ws->Log->Append("Sending handshake:").Append(handshake).Internal();
+    //ws->Log->Append("Sending handshake:").Append(handshake).Internal();
 
     // Send handshake
     wsClient.add(handshake.c_str(), handshake.length());
@@ -167,10 +154,22 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     {
         ws->Log->Append("Failed to send WebSocket handshake").Internal();
     }
-    if (ws->config.authType != AUTH_TYPE_FIRST_MESSAGE)
+    if (ws->config.authType == AUTH_TYPE_FIRST_MESSAGE)
     {
-        ws->setReady(true);
+        ws->sendAuthMessage();
     }
+    ws->setReady(true);
+}
+
+void SigmaWsClient::sendAuthMessage()
+{
+    JsonDocument doc;
+    doc["type"] = "auth";
+    doc["apiKey"] = config.apiKey;
+    doc["client"] = config.clientId;
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    sendWebSocketTextFrame(jsonStr, true);
 }
 
 void SigmaWsClient::setReady(bool ready)
@@ -191,211 +190,180 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     char *buf = (char *)data;
     String response = String(buf, len);
-    ws->Log->Append("Received data from WebSocket server").Internal();
-    ws->Log->Append(response).Internal();
-    ws->Log->Append("**************************************************").Internal();
+    //ws->Log->Append("Received data from WebSocket server").Internal();
+    //ws->Log->Append(response).Internal();
+    //ws->Log->Append("**************************************************").Internal();
 
     if (response.indexOf("HTTP/1.1 101") >= 0 &&
         response.indexOf("Upgrade: websocket") >= 0)
     {
-        ws->Log->Append("WebSocket handshake successful").Internal();
-        if (!ws->isReady && ws->config.authType & (AUTH_TYPE_FIRST_MESSAGE))
+        // Parse WebSocket frame
+        ws->Log->Append("Received data from WebSocket server").Internal();
+        byte *bytes = (byte *)data;
+        byte opcode = bytes[0] & 0x0F;
+        bool masked = (bytes[1] & 0x80) != 0;
+        ulong payload_len = bytes[1] & 0x7F;
+        ws->Log->Append("Opcode: ").Append(opcode).Internal();
+        ws->Log->Append("Masked: ").Append(masked).Internal();
+        ws->Log->Append("Payload length: ").Append(payload_len).Internal();
+
+        // Basic WebSocket frame parsing - this is simplified
+        if (len > 2)
         {
-            ws->Log->Append("Sending auth message").Internal();
-            JsonDocument doc;
-            doc["type"] = "auth";
-            doc["apiKey"] = ws->config.apiKey;
-            doc["client"] = ws->config.clientId;
-            String jsonStr;
-            serializeJson(doc, jsonStr);
-            if (ws->sendWebSocketTextFrame(jsonStr, true))
+            bool fin = (bytes[0] & 0x80) != 0;
+
+            int headerLen = 2;
+            if (payload_len == 126)
             {
-                ws->setReady(true);
+                if (len < 4)
+                    return; // Not enough data
+                payload_len = ((uint16_t)bytes[2] << 8) | bytes[3];
+                headerLen += 2;
             }
-            else
+            else if (payload_len == 127)
             {
-                ws->Log->Append("Failed to send auth message").Internal();
-                ws->setReady(false);
+                if (len < 10)
+                    return; // Not enough data
+                payload_len = 0;
+                for (int i = 0; i < 8; i++)
+                {
+                    payload_len = (payload_len << 8) | bytes[2 + i];
+                }
+                headerLen += 8;
+            }
+
+            // Skip masking key if present
+            if (masked)
+            {
+                headerLen += 4;
+            }
+
+            // Extract payload if we have enough data
+            if (len >= headerLen + payload_len)
+            {
+                String payload;
+                if (opcode != 0x02) {
+                    ws->Log->Append("Received text frame").Internal();
+                    if (masked)
+                    {
+                        uint8_t mask[4];
+                        memcpy(mask, bytes + headerLen - 4, 4);
+
+                        payload.reserve(payload_len);
+                        for (size_t i = 0; i < payload_len; i++)
+                        {
+                            payload += (char)(bytes[headerLen + i] ^ mask[i % 4]);
+                        }
+                    }
+                    else
+                    {
+                        payload = String((char *)(bytes + headerLen), payload_len);
+                    }
+                }
+                switch (opcode)
+                {
+                case 0x01:
+                {
+                    // Text frame           
+                    ws->Log->Append("Received: ").Append(payload).Internal();
+
+                    if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
+                    {
+                        SigmaInternalPkg pkg(payload);
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                        TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
+                        if (subscription != nullptr)
+                        {
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
+                        }
+                    }
+                    else
+                    {
+                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
+                    }
+                    break;
+                }
+                case 0x02:
+                { // Binary frame
+                    byte *bPayload;
+                    bool isFreeRequired = false;
+                    // Unmask if needed
+                    if (masked)
+                    {
+                        uint8_t mask[4];
+                        memcpy(mask, bytes + headerLen - 4, 4);
+
+                        bPayload = (byte *)malloc(payload_len);
+                        isFreeRequired = true;
+                        for (size_t i = 0; i < payload_len; i++)
+                        {
+                            bPayload[i] = (bytes[headerLen + i] ^ mask[i % 4]);
+                        }
+                    }
+                    else
+                    {
+                        bPayload = bytes + headerLen;
+                    }
+                    BinaryData *bd = (BinaryData *)bPayload;
+                    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
+                    if (isFreeRequired)
+                    {
+                        free(bPayload);
+                    }
+                    break;
+                }
+                case 0x08:
+                {
+                    // Close frame. Server is closing the connection. We will try to reconnect
+                    ws->Log->Append("Received close frame").Internal();
+                    ws->Disconnect();
+                    // ws->setReady(false);
+                    if (ws->shouldConnect)
+                    {
+                        ws->Connect();
+                    }
+                    break;
+                }
+                case 0x09:
+                {
+                    // Ping frame.
+                    ws->Log->Append("Received ping frame").Internal();
+                    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
+                    ws->sendWebSocketPongFrame(payload);
+                    break;
+                }
+                case 0x0A:
+                {
+                    // Pong frame
+                    ws->Log->Append("Received pong frame").Internal();
+                    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG, (void *)(payload.c_str()), payload.length()+1, portMAX_DELAY);
+                    break;
+                }
+                default:
+                {
+                    // Unknown frame
+                    ws->Log->Append("Unknown frame").Internal();
+                    break;
+                }
+                }
             }
         }
         else
         {
-            // Parse WebSocket frame
-            ws->Log->Append("Received data from WebSocket server").Internal();
-            byte *bytes = (byte *)data;
-            byte opcode = bytes[0] & 0x0F;
-            bool masked = (bytes[1] & 0x80) != 0;
-            ulong payload_len = bytes[1] & 0x7F;
-
-            // Basic WebSocket frame parsing - this is simplified
-            if (len > 2)
-            {
-                bool fin = (bytes[0] & 0x80) != 0;
-
-                int headerLen = 2;
-                if (payload_len == 126)
-                {
-                    if (len < 4)
-                        return; // Not enough data
-                    payload_len = ((uint16_t)bytes[2] << 8) | bytes[3];
-                    headerLen += 2;
-                }
-                else if (payload_len == 127)
-                {
-                    if (len < 10)
-                        return; // Not enough data
-                    payload_len = 0;
-                    for (int i = 0; i < 8; i++)
-                    {
-                        payload_len = (payload_len << 8) | bytes[2 + i];
-                    }
-                    headerLen += 8;
-                }
-
-                // Skip masking key if present
-                if (masked)
-                {
-                    headerLen += 4;
-                }
-
-                // Extract payload if we have enough data
-                if (len >= headerLen + payload_len)
-                {
-                    switch (opcode)
-                    {
-                    case 0x01:
-                    {
-                        // Text frame
-                        String payload;
-
-                        // Unmask if needed
-                        if (masked)
-                        {
-                            uint8_t mask[4];
-                            memcpy(mask, bytes + headerLen - 4, 4);
-
-                            payload.reserve(payload_len);
-                            for (size_t i = 0; i < payload_len; i++)
-                            {
-                                payload += (char)(bytes[headerLen + i] ^ mask[i % 4]);
-                            }
-                        }
-                        else
-                        {
-                            payload = String((char *)(bytes + headerLen), payload_len);
-                        }
-
-                        ws->Log->Append("Received: ").Append(payload).Internal();
-                        if (ws->config.authType & AUTH_TYPE_ALL_MESSAGES)
-                        {
-                            JsonDocument doc;
-                            deserializeJson(doc, payload);
-                            if (doc["authKey"] == nullptr || doc["authKey"] != ws->config.apiKey || doc["data"] == nullptr)
-                            {
-                                ws->Log->Append("Received message with invalid auth key or empty structure").Internal();
-                                return;
-                            }
-
-                            payload = doc["data"].as<String>();
-                        }
-
-                        if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
-                        {
-                            SigmaInternalPkg pkg(payload);
-                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
-                            TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
-                            if (subscription != nullptr)
-                            {
-                                esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
-                            }
-                        }
-                        else
-                        {
-                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length(), portMAX_DELAY);
-                        }
-
-                        break;
-                    }
-                    case 0x02:
-                    { // Binary frame
-                        byte *payload;
-                        bool isFreeRequired = false;
-                        // Unmask if needed
-                        if (masked)
-                        {
-                            uint8_t mask[4];
-                            memcpy(mask, bytes + headerLen - 4, 4);
-
-                            payload = (byte *)malloc(payload_len);
-                            isFreeRequired = true;
-                            for (size_t i = 0; i < payload_len; i++)
-                            {
-                                payload[i] = (bytes[headerLen + i] ^ mask[i % 4]);
-                            }
-                        }
-                        else
-                        {
-                            payload = bytes + headerLen;
-                            // memcpy(payload, bytes + headerLen, payload_len);
-                        }
-                        BinaryData *bd = (BinaryData *)payload;
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(bd), sizeof(bd), portMAX_DELAY);
-                        if (isFreeRequired)
-                        {
-                            free(payload);
-                        }
-                        break;
-                    }
-                    case 0x08:
-                    {
-                        // Close frame. Server is closing the connection. We will try to reconnect
-                        ws->Log->Append("Received close frame").Internal();
-                        ws->Disconnect();
-                        // ws->setReady(false);
-                        ws->Connect();
-                        break;
-                    }
-                    case 0x09:
-                    {
-                        // Ping frame.
-                        ws->Log->Append("Received ping frame").Internal();
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING, data, len, portMAX_DELAY);
-                        // TODO: ws->SendWebSocketFramePong(""); // Pong
-                        break;
-                    }
-                    case 0x0A:
-                    {
-                        // Pong frame
-                        ws->Log->Append("Received pong frame").Internal();
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG, data, len, portMAX_DELAY);
-                        // TODO: ws->SendWebSocketFramePong(""); // Pong
-                        break;
-                    }
-                    default:
-                    {
-                        // Unknown frame
-                        ws->Log->Append("Unknown frame").Internal();
-                        break;
-                    }
-                    }
-                }
-            }
-            else
-            {
-                ws->Log->Append("WebSocket handshake failed").Internal();
-                String error = "[" + ws->GetName() + "] " + "WebSocket handshake failed";
-                esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length(), portMAX_DELAY);
-            }
+            ws->Log->Append("WebSocket handshake failed").Internal();
+            String error = "[" + ws->GetName() + "] " + "WebSocket handshake failed";
+            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length()+1, portMAX_DELAY);
         }
     }
 }
+
 
 void SigmaWsClient::onError(void *arg, AsyncClient *c, int8_t error)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP error: " + error;
     ws->Log->Append(errorStr).Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length()+1, portMAX_DELAY);
 }
 
 void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
@@ -403,7 +371,7 @@ void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     String errorStr = "[" + ws->GetName() + "] " + "TCP timeout after " + String(time) + "ms";
     ws->Log->Append(errorStr).Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length(), portMAX_DELAY);
+    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length()+1, portMAX_DELAY);
     //    c->close();
 }
 

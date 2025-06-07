@@ -1,18 +1,18 @@
 #include <Arduino.h>
-// #include <SigmaUART.h>
-// #include <SigmaMQTT.h>
+#include <SigmaMQTT.h>
 #include <SigmaWsClient.h>
 #include <SigmaAsyncNetwork.h>
 #include <SigmaWsServer.h>
-// #include <SigmaProtocolDefs.h>
 
-#define PROTO_MQTT 0
+#define PROTO_MQTT 1
 #define PROTO_UART 0
 #define PROTO_WS_CLIENT 0
-#define PROTO_WS_SERVER 1
+#define PROTO_WS_SERVER 0
 
 SigmaLoger *Log;
-
+SigmaLoger *Log1;
+SigmaLoger *ZelorLog = new SigmaLoger(0);
+SigmaProtocol *prot = NULL;
 enum
 {
   EVENT_TEST1 = 0x80,
@@ -21,34 +21,41 @@ enum
   EVENT_TEST4 = 0x83,
   EVENT_TEST5 = 0x84
 } MY_EVENT_IDS;
-/*
-void TestMessaging(SigmaProtocol *protocol, esp_event_loop_handle_t eventLoop)
+
+void TestSuite1()
 {
-  if (protocol != NULL)
+  TopicSubscription subscription;
+  // subscription
+  subscription.topic = "topic1";
+  subscription.eventId = EVENT_TEST1;
+  subscription.isReSubscribe = true;
+  prot->Subscribe(subscription);
+
+  // subscription for master
+  subscription.topic = "topic2";
+  subscription.eventId = EVENT_TEST2;
+  subscription.isReSubscribe = true;
+  prot->Subscribe(subscription);
+
+  // authentication
+  Log->Append("Waiting for protocol to be ready").Internal();
+  while (prot->IsReady() == false)
   {
-    TopicSubscription subscription;
-    subscription.topic = "subscriptionTopic1";
-    subscription.eventId = EVENT_TEST1;
-    subscription.isReSubscribe = true;
-    protocol->Subscribe(subscription);
-    subscription.topic = "subscriptionTopic2";
-    subscription.eventId = EVENT_TEST2;
-    subscription.isReSubscribe = true;
-    protocol->Subscribe(subscription);
-
-    SigmaInternalPkg pkg("testTopic1", "Hello, World!");
-    esp_event_post_to(eventLoop, protocol->GetEventBase(), ESP_EVENT_ANY_ID, &pkg, sizeof(SigmaInternalPkg), portMAX_DELAY);
-
-    SigmaInternalPkg pkg2("testTopic2", "Hello, World!");
-    esp_event_post_to(eventLoop, protocol->GetEventBase(), ESP_EVENT_ANY_ID, &pkg2, sizeof(SigmaInternalPkg), portMAX_DELAY);
+    delay(100);
   }
+  Log->Append("Protocol is ready").Internal();
+  SigmaInternalPkg pkg("topic1", "Hello, World!");
+  esp_event_post_to(prot->GetEventLoop(), prot->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)&pkg, sizeof(SigmaInternalPkg), portMAX_DELAY);
+  SigmaInternalPkg pkg2("topic2", "2Hello, World!");
+  esp_event_post_to(prot->GetEventLoop(), prot->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)&pkg2, sizeof(SigmaInternalPkg), portMAX_DELAY);
 }
-*/
+/*
 void genericEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Generic event").Internal();
   Log->Append("Base: ").Append(event_base).Append(" ID: ").Append(event_id).Internal();
 }
+*/
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -168,37 +175,16 @@ void setup()
   Serial.println();
   Serial.println("----Hello, World!-----");
   Log = new SigmaLoger(512);
+  // Log1 = new SigmaLoger(512);
   esp_err_t espErr = ESP_OK;
-  /*
-    esp_event_loop_args_t loop_args = {
-        .queue_size = 100,
-        .task_name = "SigmaTransfer_event_loop",
-        .task_priority = 5,
-        .task_stack_size = 4096,
-        .task_core_id = 0};
-    esp_event_loop_handle_t eventLoop = NULL;
-    espErr = esp_event_loop_create(&loop_args, &eventLoop);
-    if (espErr != ESP_OK)
-    {
-      Log->Printf("Failed to create event loop: %d", espErr).Internal();
-      exit(1);
-    }
 
-    esp_event_loop_handle_t eventLoop = NULL;
-    espErr = esp_event_loop_create(&loop_args, &eventLoop);
-    if (espErr != ESP_OK)
-    {
-      Log->Printf("Failed to create event loop: %d", espErr).Internal();
-      exit(1);
-    }
-    */
   WiFiConfigSta wifiConfig;
   wifiConfig.ssid = "Sigma";
   wifiConfig.password = "kybwynyd";
   SigmaAsyncNetwork *network = new SigmaAsyncNetwork(wifiConfig, Log);
   espErr = esp_event_handler_instance_register_with(
       SigmaAsyncNetwork::GetEventLoop(),
-      "network",
+      ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       networkEventHandler,
       network,
@@ -208,38 +194,9 @@ void setup()
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
     exit(1);
   }
-#if PROTO_WS_CLIENT == 1
-  {
-    WSClientConfig wsConfig;
-    String name = "WS";
-    wsConfig.host = "192.168.0.102";
-    wsConfig.port = 8080;
-    wsConfig.rootPath = "/";
-    wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
-    wsConfig.apiKey = "secret-api-key-12345";
-
-    SigmaProtocol *WS = new SigmaWsClient(name, wsConfig);
-
-    espErr = esp_event_handler_instance_register_with(
-        SigmaProtocol::GetEventLoop(),
-        name.c_str(),
-        ESP_EVENT_ANY_ID,
-        protocolEventHandler,
-        WS,
-        NULL);
-    if (espErr != ESP_OK)
-    {
-      Log->Printf("Failed to register event handler: %d", espErr).Internal();
-      exit(1);
-    }
-    WS->Connect();
-    // Start delayed messaging
-    TestDelayedMessaging(name, SigmaProtocol::GetEventLoop());
-  }
-#endif
 
 #if PROTO_WS_SERVER == 1
-
+  Log->Append("Creating WS server").Internal();
   WSServerConfig wsServerConfig;
   wsServerConfig.port = 8080;
   wsServerConfig.rootPath = "/";
@@ -253,7 +210,7 @@ void setup()
       WServer->GetEventLoop(),
       WServer->GetEventBase(), // ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
-      protocolEventHandler,
+      masterHandler,
       WServer,
       NULL);
   if (espErr != ESP_OK)
@@ -261,9 +218,39 @@ void setup()
     Log->Printf("Failed to register event handler: %d", espErr).Internal();
     exit(1);
   }
+  master = WServer;
   // esp_event_post_to(SigmaProtocol::GetEventLoop(), name.c_str(), 123, (void*)"Zero \0", 6, portMAX_DELAY);
   // WServer->Connect();
 
+#endif
+
+#if PROTO_WS_CLIENT == 1
+
+  Log->Append("Creating WS client").Internal();
+  WSClientConfig wsClientConfig;
+  wsClientConfig.host = "192.168.0.47";
+  wsClientConfig.port = 8080;
+  wsClientConfig.rootPath = "/";
+  wsClientConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  SigmaWsClient *WClient = new SigmaWsClient("WSclient", Log, wsClientConfig);
+  // protocol = WClient;
+  // WClient->AddAllowableClient("W123", "secret-api-key-12345");
+
+  espErr = esp_event_handler_instance_register_with(
+      WClient->GetEventLoop(),
+      WClient->GetEventBase(),
+      ESP_EVENT_ANY_ID,
+      slaveHandler,
+      WClient,
+      NULL);
+  if (espErr != ESP_OK)
+  {
+    Log->Printf("Failed to register event handler: %d", espErr).Internal();
+    exit(1);
+  }
+
+  Log->Append("WS client created").Internal();
+  slave = WClient;
 #endif
 
 #if PROTO_UART == 1
@@ -284,11 +271,18 @@ void setup()
   mqttConfig.password = "password";
 
   SigmaProtocol *Mqtt = new SigmaMQTT(mqttConfig);
-  Transfer->AddProtocol("MQTT", Mqtt);
 #endif
+  /*
+    ulong eln = (ulong)network->GetEventLoop();
+    ulong elm = (ulong)master->GetEventLoop();
+    ulong els = (ulong)slave->GetEventLoop();
+    Log->Append("Event loop:#").Append(eln).Append("#").Append(els).Append("#").Append(elm).Append("#").Internal();
+  */
 
   network->Connect();
+  Log->Append("Network connected").Internal();
   delay(1000);
+  TestSuite1();
   // ulong loopHandle = (ulong)SigmaProtocol::GetEventLoop();
   // Log->Append("Loop handle:").Append(loopHandle).Internal();
   // esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);

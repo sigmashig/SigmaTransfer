@@ -14,7 +14,7 @@ typedef struct
 {
     String host;
     uint16_t port = 80;
-    String clientId;
+    String clientId = "WSClient_" + String(ESP.getEfuseMac(), HEX);
     String rootPath = "/";
     String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
@@ -24,8 +24,8 @@ class SigmaWsClient : public SigmaProtocol
 {
 public:
     SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig config, uint priority = 5);
-    void Subscribe(TopicSubscription subscriptionTopic);
-    void Unsubscribe(String topic);
+    // void Subscribe(TopicSubscription subscriptionTopic);
+    // void Unsubscribe(String topic);
 
 private:
     void Connect();
@@ -38,10 +38,11 @@ private:
 
     WSClientConfig config;
 
-    inline static std::map<String, TopicSubscription> eventMap;
+    //    inline static std::map<String, TopicSubscription> eventMap;
     inline static bool shouldConnect = true;
     inline static AsyncClient wsClient;
     static void onConnect(void *arg, AsyncClient *c);
+    void sendAuthMessage();
     static void onDisconnect(void *arg, AsyncClient *c);
     static void onData(void *arg, AsyncClient *c, void *data, size_t len);
     static void onError(void *arg, AsyncClient *c, int8_t error);

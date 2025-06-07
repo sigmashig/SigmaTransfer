@@ -95,10 +95,10 @@ SigmaInternalPkg::~SigmaInternalPkg()
     }
 }
 
-bool SigmaInternalPkg::IsSigmaInternalPkg(const String &msg)
+bool SigmaInternalPkg::IsSigmaInternalPkg(const String &json)
 {
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, msg);
+    DeserializationError error = deserializeJson(doc, json);
     if (error)
     {
         Serial.printf("Error deserializing JSON: %s\n", error.c_str());

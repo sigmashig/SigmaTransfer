@@ -5,6 +5,7 @@
 SigmaProtocol::SigmaProtocol(String name, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
     this->Log = (logger != nullptr) ? logger : new SigmaLoger(0);
+    this->name = name;
     //messages = std::list<Message>();
     //queueMutex = xSemaphoreCreateMutex();
     esp_event_loop_args_t loop_args = {

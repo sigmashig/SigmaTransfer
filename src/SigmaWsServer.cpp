@@ -46,6 +46,7 @@ void SigmaWsServer::Connect()
     }
     server->begin();
     setReady(true);
+    Log->Append("Websocket server started").Internal();
 }
 
 void SigmaWsServer::Disconnect()
@@ -144,6 +145,7 @@ void SigmaWsServer::processData(void *arg)
             case WS_EVT_CONNECT:
             {
                 server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Internal();
+                Serial.printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str());
                 if (server->isClientLimitReached(server, data.wsClient))
                 {
                     return;
@@ -226,7 +228,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             // Client MUST BE AUTHENTICATED before sending binary data
             // there is no check of auth attribute for AUTH_TYPE_ALL_MESSAGES
             SigmaInternalPkg pkg("", data.data, data.len, true, auth->clientId);
-            esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length(), portMAX_DELAY);
+            esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
         }
         else
         {
