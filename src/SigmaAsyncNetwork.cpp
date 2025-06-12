@@ -41,9 +41,13 @@ void SigmaAsyncNetwork::Connect()
     }
 }
 
+void SigmaAsyncNetwork::Disconnect()
+{
+}
+
 esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
-    //Log->Append("postEvent:").Append(eventId).Internal();
+    // Log->Append("postEvent:").Append(eventId).Internal();
     return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
 }
 void SigmaAsyncNetwork::startWiFiSta()

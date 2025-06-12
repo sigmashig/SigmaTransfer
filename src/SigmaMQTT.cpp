@@ -25,7 +25,6 @@ SigmaMQTT::SigmaMQTT(String name, SigmaLoger *logger, MqttConfig config, uint pr
     {
         mqtt_cfg.host = strdup(config.server.c_str());
     }
-    Log->Append("Host:").Append(mqtt_cfg.host).Internal();
 
     mqtt_cfg.port = config.port;
     if (config.username.length() > 0)
@@ -57,7 +56,6 @@ SigmaMQTT::SigmaMQTT(String name, SigmaLoger *logger, MqttConfig config, uint pr
     mqtt_cfg.reconnect_timeout_ms = 5000;
     // mqtt_cfg.protocol_ver = MQTT_PROTOCOL_V5;
 
-    Log->Append("Host:").Append(mqtt_cfg.host).Internal();
     mqttClient = esp_mqtt_client_init(&mqtt_cfg);
     err = esp_mqtt_client_register_event(mqttClient, MQTT_EVENT_ANY, onMqttEvent, this);
     if (err != ESP_OK)
