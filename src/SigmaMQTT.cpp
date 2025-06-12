@@ -141,7 +141,7 @@ void SigmaMQTT::Disconnect()
 
 void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 {
-    subscriptionTopic.topic = config.rootTopic + subscriptionTopic.topic;
+    subscriptionTopic.topic = config.rootTopic + "/" + subscriptionTopic.topic;
 
     addSubscription(subscriptionTopic);
     Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Internal();
@@ -168,6 +168,15 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
         mqtt->Log->Append("MQTT_EVENT_CONNECTED").Internal();
         mqtt->isReady = true;
         esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), PROTOCOL_CONNECTED, (void *)mqtt->name.c_str(), mqtt->name.length() + 1, portMAX_DELAY);
+        for (auto const &x : mqtt->subscriptions)
+        {
+            if (x.second.isReSubscribe)
+            {
+                mqtt->Log->Append("Resubscribing to:").Append(x.first).Internal();
+                esp_mqtt_client_subscribe(mqtt->mqttClient, x.first.c_str(), 0);
+            }
+        }
+
         break;
     }
     case MQTT_EVENT_DISCONNECTED:
@@ -193,7 +202,6 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
         char *zData;
         if (event->data_len == 0)
         {
-            mqtt->Log->Append("Data length is zero. Empty String sent").Error();
             zData = (char *)malloc(1);
             zData[0] = '\0';
         }
