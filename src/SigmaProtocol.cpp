@@ -1,6 +1,9 @@
 #include "SigmaProtocol.h"
 #include <WiFi.h>
 #include <esp_event.h>
+#include <SigmaMQTT.h>
+#include <SigmaWSServer.h>
+#include <SigmaWSClient.h>
 
 SigmaProtocol::SigmaProtocol(String name, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
@@ -44,6 +47,25 @@ bool SigmaProtocol::IsIP(String URL)
     return true;
 }
 
+SigmaProtocol *SigmaProtocol::Create(SigmaProtocolType type, SigmaProtocolConfig config, SigmaLoger *logger, uint priority)
+{
+    switch (type)
+    {
+        case SIGMA_PROTOCOL_MQTT:
+            return new SigmaMQTT(config.mqttConfig, logger, priority);
+            break;
+        case SIGMA_PROTOCOL_WS_SERVER:
+            return new SigmaWsServer(config.wsServerConfig, logger, priority);
+            break;
+        case SIGMA_PROTOCOL_WS_CLIENT:
+            return new SigmaWsClient(config.wsClientConfig, logger, priority);
+            break;
+        default:
+            return nullptr;
+    }
+    return nullptr;
+}
+
 TopicSubscription *SigmaProtocol::GetSubscription(String topic)
 {
     auto it = subscriptions.find(topic);
@@ -62,4 +84,21 @@ void SigmaProtocol::addSubscription(TopicSubscription subscription)
 void SigmaProtocol::removeSubscription(String topic)
 {
     subscriptions.erase(topic);
+}
+
+SigmaProtocolType SigmaProtocol::String2Type(String typeName)
+{
+    if (typeName == "MQTT")
+    {
+        return SIGMA_PROTOCOL_MQTT;
+    }
+    else if (typeName == "WS_SERVER")
+    {
+        return SIGMA_PROTOCOL_WS_SERVER;
+    }
+    else if (typeName == "WS_CLIENT")
+    {
+        return SIGMA_PROTOCOL_WS_CLIENT;
+    }
+    return SIGMA_PROTOCOL_UNKNOWN;
 }

@@ -13,7 +13,7 @@ ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 class SigmaAsyncNetwork
 {
 public:
-    SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log);
+    SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log = nullptr);
     ~SigmaAsyncNetwork();
     void Connect();
     void Disconnect();

@@ -52,6 +52,7 @@ typedef struct
 {
     WiFiConfigSta wifiSta;
     WiFiConfigAp wifiAp;
+    String modeString;
     wifi_mode_t wifiMode = WIFI_MODE_STA;
     bool enabled = true;
 } WiFiConfig;
@@ -136,3 +137,20 @@ typedef struct
     byte maxConnectionsPerClient = 1;
     bool enabled = true;
 } WSServerConfig;
+
+typedef enum
+{
+    SIGMA_PROTOCOL_MQTT = 0,
+    SIGMA_PROTOCOL_WS_SERVER,
+    SIGMA_PROTOCOL_WS_CLIENT,
+    SIGMA_PROTOCOL_UNKNOWN
+} SigmaProtocolType;
+
+typedef struct
+{
+    String typeString;
+    SigmaProtocolType type;
+    MqttConfig mqttConfig;
+    WSClientConfig wsClientConfig;
+    WSServerConfig wsServerConfig;
+} SigmaProtocolConfig;

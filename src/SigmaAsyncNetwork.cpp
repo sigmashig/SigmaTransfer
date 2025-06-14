@@ -7,35 +7,38 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
 {
     Log = log != nullptr ? log : new SigmaLoger(0);
     this->config = config;
-    if (config.ethernetConfig.enabled)
+    if (config.enabled)
     {
-        // TODO: Configure Ethernet
-    }
-    if (config.wifiConfig.enabled)
-    {
-        mode = config.wifiConfig.wifiMode;
-        if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
+        if (config.ethernetConfig.enabled)
         {
-            wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
+            // TODO: Configure Ethernet
         }
-        else
+        if (config.wifiConfig.enabled)
         {
-            // mode == WIFI_MODE_AP
-            wifiStaReconnectTimer = nullptr;
+            mode = config.wifiConfig.wifiMode;
+            if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
+            {
+                wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
+            }
+            else
+            {
+                // mode == WIFI_MODE_AP
+                wifiStaReconnectTimer = nullptr;
+            }
         }
-    }
-    esp_event_loop_args_t loop_args = {
-        .queue_size = 100,
-        .task_name = "SigmaAsyncNetwork_event_loop",
-        .task_priority = 100, // high priority
-        .task_stack_size = 4096,
-        .task_core_id = 0};
-    esp_err_t espErr = ESP_OK;
-    espErr = esp_event_loop_create(&loop_args, &eventLoop);
-    if (espErr != ESP_OK)
-    {
-        Log->Printf("Failed to create event loop: %d", espErr).Internal();
-        exit(1);
+        esp_event_loop_args_t loop_args = {
+            .queue_size = 100,
+            .task_name = "SigmaAsyncNetwork_event_loop",
+            .task_priority = 100, // high priority
+            .task_stack_size = 4096,
+            .task_core_id = 0};
+        esp_err_t espErr = ESP_OK;
+        espErr = esp_event_loop_create(&loop_args, &eventLoop);
+        if (espErr != ESP_OK)
+        {
+            Log->Printf("Failed to create event loop: %d", espErr).Internal();
+            exit(1);
+        }
     }
 }
 
@@ -103,8 +106,8 @@ void SigmaAsyncNetwork::startWiFiSta()
             break;
         }
         } });
-    //Log->Append("Connecting to network STA:").Append(config.wifiConfig.wifiSta.ssid).Append(":").Append(config.wifiConfig.wifiSta.password).Internal();
+    // Log->Append("Connecting to network STA:").Append(config.wifiConfig.wifiSta.ssid).Append(":").Append(config.wifiConfig.wifiSta.password).Internal();
     WiFi.mode(WIFI_STA);
     WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
-    //Log->Append("Connecting to network STA end").Internal();
+    // Log->Append("Connecting to network STA end").Internal();
 }

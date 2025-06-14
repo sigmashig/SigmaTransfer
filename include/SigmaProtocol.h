@@ -42,6 +42,8 @@ public:
     virtual esp_event_base_t GetEventBase() { return eventBase; };
     virtual String GetName() { return name; };
     virtual bool IsReady() { return isReady; };
+    static SigmaProtocol *Create(String TypeName, SigmaProtocolConfig config, SigmaLoger *logger = nullptr, uint priority = 5) { return Create(String2Type(TypeName), config, logger, priority); };
+    static SigmaProtocol *Create(SigmaProtocolType type, SigmaProtocolConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
 
 protected:
     
@@ -63,6 +65,7 @@ protected:
     TopicSubscription *GetSubscription(String topic);
     void addSubscription(TopicSubscription subscription);
     void removeSubscription(String topic);
+    static SigmaProtocolType String2Type(String typeName);
 
 private : 
 };
