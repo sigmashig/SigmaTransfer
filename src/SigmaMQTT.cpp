@@ -114,6 +114,7 @@ void SigmaMQTT::protocolEventHandler(void *arg, esp_event_base_t event_base, int
     //mqtt->Log->Append("protocolEventHandler:").Append(event_id).Internal();
     // SigmaInternalPkg *pkg = (SigmaInternalPkg *)event_data;
     SigmaInternalPkg pkg((char *)event_data);
+    
     if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
     {
         bool res;
@@ -150,7 +151,9 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 
 void SigmaMQTT::publish(SigmaInternalPkg *pkg)
 {
-    esp_mqtt_client_enqueue(mqttClient, (config.rootTopic + pkg->GetTopic()).c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length() + 1, 0, false, true);
+    String topic = config.rootTopic + (config.rootTopic.endsWith("/") ? "" : "/") + pkg->GetTopic();
+    Log->Append("Publishing to:").Append(topic).Info();
+    esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length() + 1, 0, false, true);
 }
 
 void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
