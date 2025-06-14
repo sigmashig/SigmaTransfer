@@ -40,7 +40,7 @@ typedef struct
 class SigmaWsServer : public SigmaProtocol
 {
 public:
-    SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority = 5);
+    SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority = 5);
     ~SigmaWsServer();
     // void Subscribe(TopicSubscription subscriptionTopic) {};
     // void Unsubscribe(String topic) {};

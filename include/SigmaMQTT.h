@@ -11,7 +11,7 @@
 class SigmaMQTT : public SigmaProtocol
 {
 public:
-    SigmaMQTT(String name, SigmaLoger *logger, MqttConfig config, uint priority = 5);
+    SigmaMQTT(MqttConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
     ~SigmaMQTT();
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);

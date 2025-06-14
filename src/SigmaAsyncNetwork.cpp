@@ -53,7 +53,6 @@ void SigmaAsyncNetwork::Connect()
     if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
     {
         startWiFiSta();
-        WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
     }
 }
 
@@ -63,14 +62,12 @@ void SigmaAsyncNetwork::Disconnect()
 
 esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
-    // Log->Append("postEvent:").Append(eventId).Internal();
     return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
 }
 void SigmaAsyncNetwork::startWiFiSta()
 {
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
-        //PLogger->Append("WiFi event: ").Append(event).Internal();
         switch (event)
         {
         case SYSTEM_EVENT_STA_GOT_IP:
@@ -98,15 +95,16 @@ void SigmaAsyncNetwork::startWiFiSta()
         case SYSTEM_EVENT_STA_START:
         case SYSTEM_EVENT_STA_CONNECTED:
         { // known event - do nothing
-            //Log->Append("WiFi [0,2,4] event: ").Append(event).Internal();
             break;
         }
         default:
         {
-            Log->Append("WiFi event: ").Append(event).Internal();
+//            Log->Append("WiFi event: ").Append(event).Internal();
             break;
         }
         } });
+    //Log->Append("Connecting to network STA:").Append(config.wifiConfig.wifiSta.ssid).Append(":").Append(config.wifiConfig.wifiSta.password).Internal();
     WiFi.mode(WIFI_STA);
     WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
+    //Log->Append("Connecting to network STA end").Internal();
 }

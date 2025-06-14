@@ -443,10 +443,10 @@ void setup()
   Log->Append("Creating MQTT").Internal();
   MqttConfig mqttConfig;
   mqttConfig.server = "192.168.0.102";
-  mqttConfig.rootTopic = "test/test1/";
+  mqttConfig.rootTopic = "test/test1";
   mqttConfig.username = "test";
   mqttConfig.password = "password";
-  SigmaMQTT *Mqtt = new SigmaMQTT("MQTT", Log, mqttConfig);
+  SigmaMQTT *Mqtt = new SigmaMQTT(mqttConfig, Log);
   Log->Append("MQTT created").Internal();
   protocol = Mqtt;
   espErr = esp_event_handler_instance_register_with(
@@ -461,7 +461,7 @@ void setup()
     Log->Printf("Failed to register event handler: %d", espErr).Internal();
     exit(1);
   }
-
+  Log->Append("event handler registered").Internal();
 #endif
   /*
     ulong eln = (ulong)network->GetEventLoop();
@@ -469,7 +469,7 @@ void setup()
     ulong els = (ulong)slave->GetEventLoop();
     Log->Append("Event loop:#").Append(eln).Append("#").Append(els).Append("#").Append(elm).Append("#").Internal();
   */
-  //Log->Append("Connecting to network").Internal();
+  Log->Append("Connecting to network").Internal();
   network->Connect();
   //Log->Append("Connecting to network end").Internal();
   delay(1000);

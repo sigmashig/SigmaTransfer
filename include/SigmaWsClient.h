@@ -14,7 +14,7 @@
 class SigmaWsClient : public SigmaProtocol
 {
 public:
-    SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig config, uint priority = 5);
+    SigmaWsClient(WSClientConfig config, SigmaLoger *logger, uint priority = 5);
     // void Subscribe(TopicSubscription subscriptionTopic);
     // void Unsubscribe(String topic);
 

@@ -5,7 +5,7 @@
 #include <esp_event.h>
 #include <ArduinoJson.h>
 
-SigmaWsServer::SigmaWsServer(String name, SigmaLoger *logger, WSServerConfig config, int priority) : SigmaProtocol(name, logger, priority)
+SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaProtocol("SigmaWsServer", logger, priority)
 {
     this->config = config;
     this->name = name;

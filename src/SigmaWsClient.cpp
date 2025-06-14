@@ -6,7 +6,7 @@
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
 
-SigmaWsClient::SigmaWsClient(String name, SigmaLoger *logger, WSClientConfig _config, uint priority) : SigmaProtocol(name, logger, priority)
+SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaProtocol("SigmaWsClient", logger, priority)
 {
     config = _config;
     this->name = name;
