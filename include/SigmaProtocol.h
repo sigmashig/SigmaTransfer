@@ -6,15 +6,8 @@
 #include <map>
 #include <list>
 #include <esp_event.h>
-#include <SigmaAsyncNetwork.h>
-// ESP_EVENT_DEFINE_BASE(SIGMAPROTOCOL_EVENT);
-
-typedef struct
-{
-    String topic;
-    int32_t eventId = PROTOCOL_SEND_SIGMA_MESSAGE;
-    bool isReSubscribe = true;
-} TopicSubscription;
+//#include <SigmaAsyncNetwork.h>
+#include "SigmaTransferDefs.h"
 
 typedef struct
 {
@@ -22,21 +15,6 @@ typedef struct
     String topic;
     String payload;
 } Message;
-
-typedef struct
-{
-    byte *data;
-    size_t size;
-} BinaryData;
-
-enum AuthType
-{
-    AUTH_TYPE_NONE = 0,
-    AUTH_TYPE_URL = 0x01,
-    AUTH_TYPE_BASIC = 0x02,
-    AUTH_TYPE_FIRST_MESSAGE = 0x04,
-    AUTH_TYPE_ALL_MESSAGES = 0x08 // All messages are authenticated. No Binary Data. Text/Sigma Only. Converted to Json
-};
 
 class SigmaProtocol
 {

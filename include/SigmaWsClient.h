@@ -9,16 +9,7 @@
 #include <esp_event.h>
 #include "SigmaProtocol.h"
 #include <AsyncTCP.h>
-
-typedef struct
-{
-    String host;
-    uint16_t port = 80;
-    String clientId = "WSClient_" + String(ESP.getEfuseMac(), HEX);
-    String rootPath = "/";
-    String apiKey = "";
-    byte authType = AUTH_TYPE_NONE;
-} WSClientConfig;
+#include "SigmaTransferDefs.h"
 
 class SigmaWsClient : public SigmaProtocol
 {

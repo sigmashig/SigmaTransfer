@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <string.h>
 #include <SigmaLoger.h>
+#include "SigmaAsyncNetwork.h"
 
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 

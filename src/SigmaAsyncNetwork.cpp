@@ -2,12 +2,28 @@
 #include "WiFi.h"
 
 ESP_EVENT_DEFINE_BASE(SIGMAASYNCNETWORK_EVENT);
-SigmaAsyncNetwork::SigmaAsyncNetwork(WiFiConfigSta config, SigmaLoger *log) : mode(SIGMAASYNCNETWORK_MODE_STA)
+
+SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
 {
     Log = log != nullptr ? log : new SigmaLoger(0);
-    configWiFi = config;
-    Log->Append("Configuring WiFi network: ").Append(configWiFi.ssid).Info();
-    wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
+    this->config = config;
+    if (config.ethernetConfig.enabled)
+    {
+        // TODO: Configure Ethernet
+    }
+    if (config.wifiConfig.enabled)
+    {
+        mode = config.wifiConfig.wifiMode;
+        if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
+        {
+            wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
+        }
+        else
+        {
+            // mode == WIFI_MODE_AP
+            wifiStaReconnectTimer = nullptr;
+        }
+    }
     esp_event_loop_args_t loop_args = {
         .queue_size = 100,
         .task_name = "SigmaAsyncNetwork_event_loop",
@@ -29,15 +45,15 @@ SigmaAsyncNetwork::~SigmaAsyncNetwork()
 
 void SigmaAsyncNetwork::reconnectWiFiSta(TimerHandle_t xTimer)
 {
-    // startWiFiSta();
-    WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
+    WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
 }
+
 void SigmaAsyncNetwork::Connect()
 {
-    if (mode == SIGMAASYNCNETWORK_MODE_STA)
+    if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
     {
         startWiFiSta();
-        WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
+        WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
     }
 }
 
@@ -92,5 +108,5 @@ void SigmaAsyncNetwork::startWiFiSta()
         }
         } });
     WiFi.mode(WIFI_STA);
-    WiFi.begin(configWiFi.ssid.c_str(), configWiFi.password.c_str());
+    WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
 }

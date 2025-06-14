@@ -6,50 +6,14 @@
 #include <esp_event.h>
 #include <esp_event.h>
 #include "SigmaLoger.h"
+#include "SigmaTransferDefs.h"
 
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);
-enum
-{
-    PROTOCOL_CONNECTED = 0x1000,
-    PROTOCOL_DISCONNECTED,
-    PROTOCOL_AP_CONNECTED,
-    PROTOCOL_STA_CONNECTED,
-    PROTOCOL_AP_DISCONNECTED,
-    PROTOCOL_STA_DISCONNECTED,
-    PROTOCOL_ERROR,
-    // PROTOCOL_AUTH_SUCCESS,
-    // PROTOCOL_AUTH_FAILED,
-    PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE,
-    PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
-    PROTOCOL_RECEIVED_SIGMA_MESSAGE,
-    PROTOCOL_RECEIVED_PING,
-    PROTOCOL_RECEIVED_PONG,
-    PROTOCOL_SEND_RAW_TEXT_MESSAGE,
-    PROTOCOL_SEND_RAW_BINARY_MESSAGE,
-    PROTOCOL_SEND_SIGMA_MESSAGE,
-    PROTOCOL_SEND_PING,
-    PROTOCOL_SEND_PONG,
-} EVENT_IDS;
-
-typedef enum
-{
-    SIGMAASYNCNETWORK_MODE_NONE = 0,
-    SIGMAASYNCNETWORK_MODE_STA,
-    SIGMAASYNCNETWORK_MODE_AP,
-    SIGMAASYNCNETWORK_MODE_STA_AP,
-
-} WorkMode;
-
-typedef struct
-{
-    String ssid;
-    String password;
-} WiFiConfigSta;
 
 class SigmaAsyncNetwork
 {
 public:
-    SigmaAsyncNetwork(WiFiConfigSta config, SigmaLoger *log);
+    SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log);
     ~SigmaAsyncNetwork();
     void Connect();
     void Disconnect();
@@ -58,10 +22,10 @@ public:
 
 private:
     SigmaLoger *Log;
-    inline static WiFiConfigSta configWiFi;
+    inline static NetworkConfig config;
     inline static bool isConnected = false;
     bool shouldConnect = true;
-    WorkMode mode = SIGMAASYNCNETWORK_MODE_NONE;
+    wifi_mode_t mode = WIFI_MODE_STA;
 
     TimerHandle_t wifiStaReconnectTimer;
     inline static esp_event_loop_handle_t eventLoop;

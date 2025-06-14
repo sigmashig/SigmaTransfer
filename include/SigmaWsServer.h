@@ -10,17 +10,7 @@
 #include "SigmaProtocol.h"
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-
-typedef struct
-{
-    uint16_t port = 80;
-    String rootPath = "/";
-    // String apiKey = "";
-    byte authType = AUTH_TYPE_NONE;
-    byte maxClients = 10;
-    byte maxConnectionsPerClient = 1;
-
-} WSServerConfig;
+#include "SigmaTransferDefs.h"
 
 typedef struct
 {

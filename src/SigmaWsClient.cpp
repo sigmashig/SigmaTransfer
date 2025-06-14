@@ -1,6 +1,7 @@
 #include "SigmaWsClient.h"
 #include <ArduinoJson.h>
 #include <libb64/cencode.h>
+#include "SigmaAsyncNetwork.h"
 
 // ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 ESP_EVENT_DECLARE_BASE(SIGMAASYNCNETWORK_EVENT);

@@ -344,10 +344,13 @@ void setup()
       exit(1);
     }
     */
-  WiFiConfigSta wifiConfig;
-  wifiConfig.ssid = "Sigma";
-  wifiConfig.password = "kybwynyd";
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(wifiConfig, Log1);
+  NetworkConfig networkConfig;
+  networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
+  networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
+  networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
+  networkConfig.wifiConfig.enabled = true;
+  networkConfig.ethernetConfig.enabled = false;
+  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log1);
   espErr = esp_event_handler_instance_register_with(
       SigmaAsyncNetwork::GetEventLoop(),
       ESP_EVENT_ANY_BASE,

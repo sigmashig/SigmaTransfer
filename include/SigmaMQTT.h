@@ -3,19 +3,10 @@
 
 #include "SigmaProtocol.h"
 #include "SigmaInternalPkg.h"
+#include "SigmaTransferDefs.h"
 #include "mqtt_client.h"
 
 #pragma once
-typedef struct
-{
-    String server;
-    uint16_t port = 1883;
-    String rootTopic;
-    String username = "";
-    String password = "";
-    String clientId = "Client_" + String(ESP.getEfuseMac(), HEX);
-    int keepAlive = 60;
-} MqttConfig;
 
 class SigmaMQTT : public SigmaProtocol
 {

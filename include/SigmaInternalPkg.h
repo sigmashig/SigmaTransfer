@@ -3,19 +3,7 @@
 
 #pragma once
 #include <Arduino.h>
-
-// #define INTERNALPKG_TOPIC_SEPARATOR 0x01
-// #define INTERNALPKG_MESSAGE_END 0x00
-typedef struct
-{
-    String clientId="";
-    String payload="";
-    bool isBinary=false;
-    //String protocol="";
-    String topic="";
-    byte *binaryPayload=nullptr;
-    int binaryPayloadLength=0;
-} SigmaInternalStruct;
+#include "SigmaTransferDefs.h"
 
 class SigmaInternalPkg
 {
