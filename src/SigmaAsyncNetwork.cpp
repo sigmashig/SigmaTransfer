@@ -69,6 +69,7 @@ esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t 
 }
 void SigmaAsyncNetwork::startWiFiSta()
 {
+    Serial.println("startWiFiSta");
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         switch (event)
@@ -107,7 +108,11 @@ void SigmaAsyncNetwork::startWiFiSta()
         }
         } });
     // Log->Append("Connecting to network STA:").Append(config.wifiConfig.wifiSta.ssid).Append(":").Append(config.wifiConfig.wifiSta.password).Internal();
+    Serial.println("startWiFiSta 1");
     WiFi.mode(WIFI_STA);
+    Serial.println("startWiFiSta 2");
+    Serial.printf("Connecting to network STA: %s, %s\n", config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
     WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
+    Serial.println("startWiFiSta end");
     // Log->Append("Connecting to network STA end").Internal();
 }
