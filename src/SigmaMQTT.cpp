@@ -81,7 +81,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SIGMAASYNCNETWORK_EVENT, ESP_EVENT_ANY_ID, networkEventHandler, this);
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
 
-    //Log->Append("MQTT client initialized").Internal();
+    // Log->Append("MQTT client initialized").Internal();
 }
 
 SigmaMQTT::~SigmaMQTT()
@@ -97,7 +97,7 @@ SigmaMQTT::~SigmaMQTT()
 void SigmaMQTT::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaMQTT *mqtt = (SigmaMQTT *)arg;
-    //mqtt->Log->Append("networkEventHandler:").Append(event_id).Internal();
+    // mqtt->Log->Append("networkEventHandler:").Append(event_id).Internal();
     if (event_id == PROTOCOL_STA_CONNECTED)
     {
         mqtt->Connect();
@@ -111,10 +111,10 @@ void SigmaMQTT::networkEventHandler(void *arg, esp_event_base_t event_base, int3
 void SigmaMQTT::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaMQTT *mqtt = (SigmaMQTT *)arg;
-    //mqtt->Log->Append("protocolEventHandler:").Append(event_id).Internal();
-    // SigmaInternalPkg *pkg = (SigmaInternalPkg *)event_data;
+    // mqtt->Log->Append("protocolEventHandler:").Append(event_id).Internal();
+    //  SigmaInternalPkg *pkg = (SigmaInternalPkg *)event_data;
     SigmaInternalPkg pkg((char *)event_data);
-    
+
     if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
     {
         bool res;
@@ -136,7 +136,7 @@ void SigmaMQTT::Connect()
 
 void SigmaMQTT::Disconnect()
 {
-//    Log->Append("Disconnecting from MQTT").Info();
+    //    Log->Append("Disconnecting from MQTT").Info();
     esp_mqtt_client_stop(mqttClient);
 }
 
@@ -153,13 +153,13 @@ void SigmaMQTT::publish(SigmaInternalPkg *pkg)
 {
     String topic = config.rootTopic + (config.rootTopic.endsWith("/") ? "" : "/") + pkg->GetTopic();
     Log->Append("Publishing to:").Append(topic).Info();
-    esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length() + 1, 0, false, true);
+    esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), 0, false, true);
 }
 
 void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     SigmaMQTT *mqtt = (SigmaMQTT *)handler_args;
-    //mqtt->Log->Append("onMqttEvent:").Append(event_id).Internal();
+    // mqtt->Log->Append("onMqttEvent:").Append(event_id).Internal();
     esp_mqtt_event_id_t mqtt_event_id = (esp_mqtt_event_id_t)event_id;
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     // esp_mqtt_client_handle_t client = (*event)->client;
@@ -168,7 +168,7 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
     {
     case MQTT_EVENT_CONNECTED:
     {
-        //mqtt->Log->Append("MQTT_EVENT_CONNECTED").Internal();
+        // mqtt->Log->Append("MQTT_EVENT_CONNECTED").Internal();
         mqtt->isReady = true;
         esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), PROTOCOL_CONNECTED, (void *)mqtt->name.c_str(), mqtt->name.length() + 1, portMAX_DELAY);
         for (auto const &x : mqtt->subscriptions)
@@ -191,7 +191,7 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
     }
     case MQTT_EVENT_DATA:
     {
-        //mqtt->Log->Append("MQTT_EVENT_DATA").Internal();
+        // mqtt->Log->Append("MQTT_EVENT_DATA").Internal();
         if (event->topic_len == 0)
         {
             mqtt->Log->Append("Topic length is zero. Ignore").Warn();
@@ -233,12 +233,12 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
     }
     case MQTT_EVENT_BEFORE_CONNECT:
     {
-        //mqtt->Log->Append("MQTT_EVENT_BEFORE_CONNECT").Internal();
+        // mqtt->Log->Append("MQTT_EVENT_BEFORE_CONNECT").Internal();
         break;
     }
     case MQTT_EVENT_DELETED:
     {
-        //mqtt->Log->Append("MQTT_EVENT_DELETED").Internal();
+        // mqtt->Log->Append("MQTT_EVENT_DELETED").Internal();
         break;
     }
     case MQTT_EVENT_ERROR:
