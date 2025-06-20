@@ -153,7 +153,7 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 void SigmaMQTT::publish(SigmaInternalPkg *pkg)
 {
     String topic = config.rootTopic + (config.rootTopic.endsWith("/") ? "" : "/") + pkg->GetTopic();
-    Log->Append("Publishing to:").Append(topic).Info();
+    //Log->Append("Publishing to:").Append(topic).Internal();
     esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), 0, false, true);
 }
 

@@ -83,7 +83,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         this->isAllocated = false;
         binaryPayload = nullptr;
     }
-    //Serial.printf("payload: %s\n", doc["payload"].as<String>().c_str());
+    // Serial.printf("payload: %s\n", doc["payload"].as<String>().c_str());
     init(doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
 }
 
@@ -101,7 +101,7 @@ bool SigmaInternalPkg::IsSigmaInternalPkg(const String &json)
     DeserializationError error = deserializeJson(doc, json);
     if (error)
     {
-        Serial.printf("Error deserializing JSON: %s\n", error.c_str());
+        Serial.printf("[check]Error deserializing JSON: %s\n", error.c_str());
         return false;
     }
     if (!doc["topic"].is<String>())

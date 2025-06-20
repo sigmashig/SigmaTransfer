@@ -38,8 +38,6 @@ public:
     };
     virtual void Unsubscribe(TopicSubscription topic) { Unsubscribe(topic.topic); };
 
-    // virtual bool IsNetworkRequired() { return isNetworkRequired; };
-    static bool IsIP(String URL);
     virtual esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
     virtual esp_event_base_t GetEventBase() { return eventBase; };
     virtual String GetName() { return name; };
@@ -68,6 +66,7 @@ protected:
     void addSubscription(TopicSubscription subscription);
     void removeSubscription(String topic);
     static SigmaProtocolType String2Type(String typeName);
+    static bool IsIP(String URL);
 
 private:
 };

@@ -6,7 +6,6 @@
 #include <WiFi.h>
 #include <esp_event.h>
 
-
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", logger, priority)
 {
     config = _config;
@@ -177,7 +176,7 @@ void SigmaWsClient::sendAuthMessage()
 void SigmaWsClient::setReady(bool ready)
 {
     isReady = ready;
-    Log->Append("Setting ready to ").Append(ready).Internal();
+    Log->Append("Setting ready: ").Append(ready).Internal();
     esp_event_post_to(SigmaConnection::GetEventLoop(), GetEventBase(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
 }
 
@@ -194,7 +193,6 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
     String response = String(buf, len);
     // ws->Log->Append("Received data from WebSocket server").Internal();
     // ws->Log->Append(response).Internal();
-    // ws->Log->Append("**************************************************").Internal();
 
     if (response.indexOf("HTTP/1.1 101") >= 0 &&
         response.indexOf("Upgrade: websocket") >= 0)

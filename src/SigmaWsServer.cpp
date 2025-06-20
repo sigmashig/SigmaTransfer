@@ -144,7 +144,6 @@ void SigmaWsServer::processData(void *arg)
             case WS_EVT_CONNECT:
             {
                 server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Internal();
-                Serial.printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str());
                 if (server->isClientLimitReached(server, data.wsClient))
                 {
                     return;
