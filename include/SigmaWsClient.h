@@ -1,5 +1,5 @@
-#ifndef SIGMAWS_H
-#define SIGMAWS_H
+#ifndef SIGMAWSCLIENT_H
+#define SIGMAWSCLIENT_H
 
 #pragma once
 #include <Arduino.h>
@@ -7,11 +7,11 @@
 #include <SigmaInternalPkg.h>
 #include <map>
 #include <esp_event.h>
-#include "SigmaProtocol.h"
+#include "SigmaConnection.h"
 #include <AsyncTCP.h>
 #include "SigmaTransferDefs.h"
 
-class SigmaWsClient : public SigmaProtocol
+class SigmaWsClient : public SigmaConnection
 {
 public:
     SigmaWsClient(WSClientConfig config, SigmaLoger *logger, uint priority = 5);

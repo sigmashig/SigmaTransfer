@@ -153,4 +153,4 @@ typedef struct
     MqttConfig mqttConfig;
     WSClientConfig wsClientConfig;
     WSServerConfig wsServerConfig;
-} SigmaProtocolConfig;
+} SigmaConnectionsConfig;

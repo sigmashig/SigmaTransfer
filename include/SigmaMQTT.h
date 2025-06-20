@@ -1,14 +1,14 @@
 #ifndef SIGMAMQTT_H
 #define SIGMAMQTT_H
 
-#include "SigmaProtocol.h"
-#include "SigmaInternalPkg.h"
-#include "SigmaTransferDefs.h"
-#include "mqtt_client.h"
-
 #pragma once
 
-class SigmaMQTT : public SigmaProtocol
+#include "SigmaConnection.h"
+#include "SigmaTransferDefs.h"
+#include "SigmaInternalPkg.h"
+#include <mqtt_client.h>
+
+class SigmaMQTT : public SigmaConnection
 {
 public:
     SigmaMQTT(MqttConfig config, SigmaLoger *logger = nullptr, uint priority = 5);

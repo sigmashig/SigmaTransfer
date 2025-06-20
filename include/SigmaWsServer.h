@@ -7,10 +7,12 @@
 #include <SigmaInternalPkg.h>
 #include <map>
 #include <esp_event.h>
-#include "SigmaProtocol.h"
+#include "SigmaConnection.h"
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "SigmaTransferDefs.h"
+#include <AsyncWebSocket.h>
+#include <ArduinoJson.h>
 
 typedef struct
 {
@@ -37,7 +39,7 @@ typedef struct
     size_t len;
 } SigmaWsServerData;
 
-class SigmaWsServer : public SigmaProtocol
+class SigmaWsServer : public SigmaConnection
 {
 public:
     SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority = 5);

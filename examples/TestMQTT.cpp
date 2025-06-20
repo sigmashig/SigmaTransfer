@@ -23,15 +23,15 @@ enum
 } MY_EVENT_IDS;
 
 // int step = 0;
-// SigmaProtocol *master = NULL;
-// SigmaProtocol *slave = NULL;
-SigmaProtocol *protocol = NULL;
+// SigmaConnection *master = NULL;
+// SigmaConnection *slave = NULL;
+SigmaConnection *protocol = NULL;
 /*
 void slaveHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Slave event#").Append(step).Internal();
   Log->Append("Slave.Base: ").Append(event_base).Append(" ID: ").Append(event_id).Internal();
-  SigmaProtocol *protocol = (SigmaProtocol *)arg;
+  SigmaConnection *protocol = (SigmaConnection *)arg;
   if (protocol == NULL)
   {
     Log->Append("Protocol is NULL").Internal();
@@ -80,7 +80,7 @@ void masterHandler(void *arg, esp_event_base_t event_base, int32_t event_id, voi
   Log->Append("Master event#").Append(step).Internal();
   Log->Append("Master.Base: ").Append(event_base).Append(" ID: ").Append(event_id).Internal();
 
-  SigmaProtocol *protocol = (SigmaProtocol *)arg;
+  SigmaConnection *protocol = (SigmaConnection *)arg;
   if (protocol == NULL)
   {
     Log->Append("Protocol is NULL").Internal();
@@ -146,7 +146,7 @@ void TestSuite1()
   subscription.topic = "topic1";
   subscription.eventId = EVENT_TEST1;
   subscription.isReSubscribe = true;
-  //Log->Printf("Protocol:%p#", protocol).Internal();
+  // Log->Printf("Protocol:%p#", protocol).Internal();
   protocol->Subscribe(subscription);
   // subscription for master
   subscription.topic = "topic2";
@@ -161,7 +161,7 @@ void TestSuite1()
   }
   SigmaInternalPkg pkg("topic1", "Hello from topic");
   Log->Append("Protocol is ready").Internal();
-  esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length()+1, portMAX_DELAY);
+  esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length() + 1, portMAX_DELAY);
 }
 /*
 void genericEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -173,7 +173,7 @@ void genericEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-  SigmaProtocol *protocol = (SigmaProtocol *)arg;
+  SigmaConnection *protocol = (SigmaConnection *)arg;
   if (protocol == NULL)
   {
     Log->Append("Protocol is NULL").Internal();
@@ -319,7 +319,7 @@ void setup()
   Log = new SigmaLoger(512);
   Log1 = new SigmaLoger(512);
 
-  //esp_event_loop_create_default();
+  // esp_event_loop_create_default();
   esp_err_t espErr = ESP_OK;
   /*
     esp_event_loop_args_t loop_args = {
@@ -395,7 +395,7 @@ void setup()
     exit(1);
   }
   master = WServer;
-  // esp_event_post_to(SigmaProtocol::GetEventLoop(), name.c_str(), 123, (void*)"Zero \0", 6, portMAX_DELAY);
+  // esp_event_post_to(SigmaConnection::GetEventLoop(), name.c_str(), 123, (void*)"Zero \0", 6, portMAX_DELAY);
   // WServer->Connect();
 
 #endif
@@ -435,7 +435,7 @@ void setup()
   uartConfig.rxPin = 2;
   uartConfig.baudRate = 9600;
 
-  SigmaProtocol *Uart = new SigmaUART(uartConfig);
+  SigmaConnection *Uart = new SigmaUART(uartConfig);
   Transfer->AddProtocol("UART", Uart);
 
 #endif
@@ -471,7 +471,7 @@ void setup()
   */
   Log->Append("Connecting to network").Internal();
   network->Connect();
-  //Log->Append("Connecting to network end").Internal();
+  // Log->Append("Connecting to network end").Internal();
   delay(1000);
   /*
   Log->Append("Waiting for protocol to be ready").Internal();
@@ -483,9 +483,9 @@ void setup()
   // Log->Append("Protocol is ready").Internal();
   // TestSuite1();
 
-  // ulong loopHandle = (ulong)SigmaProtocol::GetEventLoop();
+  // ulong loopHandle = (ulong)SigmaConnection::GetEventLoop();
   // Log->Append("Loop handle:").Append(loopHandle).Internal();
-  // esp_event_post_to(SigmaProtocol::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
+  // esp_event_post_to(SigmaConnection::GetEventLoop(), "generic", 67, (void *)"Start\0", 6, portMAX_DELAY);
   Log->Append("Setup end").Internal();
 }
 

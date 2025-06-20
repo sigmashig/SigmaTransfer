@@ -1,4 +1,5 @@
 #include "SigmaMQTT.h"
+#include "SigmaInternalPkg.h"
 #include <esp_event.h>
 #include <WiFi.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
-SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : SigmaProtocol("SigmaMQTT", logger, priority)
+SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaMQTT", logger, priority)
 {
     this->config = config;
     esp_mqtt_client_config_t mqtt_cfg;
@@ -16,7 +17,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
 
     mqtt_cfg.event_loop_handle = GetEventLoop();
 
-    if (SigmaProtocol::IsIP(config.server))
+    if (SigmaConnection::IsIP(config.server))
     {
         IPAddress ip;
         ip.fromString(config.server);

@@ -1,11 +1,10 @@
 #include "SigmaWsServer.h"
 #include "SigmaInternalPkg.h"
 #include "SigmaAsyncNetwork.h"
-#include "SigmaProtocol.h"
 #include <esp_event.h>
 #include <ArduinoJson.h>
 
-SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaProtocol("SigmaWsServer", logger, priority)
+SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaConnection("SigmaWsServer", logger, priority)
 {
     this->config = config;
     this->name = name;
@@ -228,7 +227,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             // Client MUST BE AUTHENTICATED before sending binary data
             // there is no check of auth attribute for AUTH_TYPE_ALL_MESSAGES
             SigmaInternalPkg pkg("", data.data, data.len, true, auth->clientId);
-            esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length()+1, portMAX_DELAY);
+            esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
         }
         else
         {
