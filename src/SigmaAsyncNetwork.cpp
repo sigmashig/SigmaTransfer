@@ -1,7 +1,6 @@
 #include "SigmaAsyncNetwork.h"
 #include "WiFi.h"
 
-ESP_EVENT_DEFINE_BASE(SIGMAASYNCNETWORK_EVENT);
 
 SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
 {
@@ -65,7 +64,7 @@ void SigmaAsyncNetwork::Disconnect()
 
 esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
-    return esp_event_post_to(eventLoop, SIGMAASYNCNETWORK_EVENT, eventId, eventData, eventDataSize, portMAX_DELAY);
+    return esp_event_post_to(eventLoop, eventBase, eventId, eventData, eventDataSize, portMAX_DELAY);
 }
 void SigmaAsyncNetwork::startWiFiSta()
 {
