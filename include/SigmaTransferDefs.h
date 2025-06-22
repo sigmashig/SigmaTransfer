@@ -80,6 +80,8 @@ typedef struct
     String topic = "";
     byte *binaryPayload = nullptr;
     int binaryPayloadLength = 0;
+    byte qos = 0;
+    bool retained = false;
 } SigmaInternalStruct;
 
 typedef struct
@@ -150,6 +152,8 @@ typedef struct
 {
     String typeString;
     SigmaProtocolType type;
+    uint priority;
+
     MqttConfig mqttConfig;
     WSClientConfig wsClientConfig;
     WSServerConfig wsServerConfig;

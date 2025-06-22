@@ -16,7 +16,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
     esp_err_t err;
 
     mqtt_cfg.event_loop_handle = GetEventLoop();
-
+    Log->Append("MQTT server:").Append(config.server).Append(":").Append(config.port).Debug();
     if (SigmaConnection::IsIP(config.server))
     {
         IPAddress ip;
@@ -153,8 +153,9 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 void SigmaMQTT::publish(SigmaInternalPkg *pkg)
 {
     String topic = config.rootTopic + (config.rootTopic.endsWith("/") ? "" : "/") + pkg->GetTopic();
-    //Log->Append("Publishing to:").Append(topic).Internal();
-    esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), 0, false, true);
+    Log->Append("P:[").Append(topic).Append("]#").Append(pkg->GetPayload()).Append("#").Internal();
+    // esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), 0, false, true);
+    esp_mqtt_client_publish(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), pkg->GetQos(), pkg->GetRetained());
 }
 
 void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)

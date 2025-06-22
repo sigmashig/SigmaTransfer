@@ -3,7 +3,7 @@
 #include <libb64/cdecode.h>
 #include <libb64/cencode.h>
 
-SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, byte qos, bool retained, bool isBinary, String clientId)
 {
     int length;
     byte *binaryPayload = nullptr;
@@ -22,10 +22,10 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, bool isBinary, 
         binaryPayload = nullptr;
     }
 
-    init(topic, payload, isBinary, clientId, binaryPayload, length);
+    init(topic, payload, qos, retained, isBinary, clientId, binaryPayload, length);
 }
 
-SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, byte qos, bool retained, bool isBinary, String clientId)
 {
     int length;
     String payload = "";
@@ -34,10 +34,10 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binary
     payload = GetEncoded(binaryPayload, binaryPayloadLength);
     this->isAllocated = false;
 
-    init(topic, payload, isBinary, clientId, binaryPayload, binaryPayloadLength);
+    init(topic, payload, qos, retained, isBinary, clientId, binaryPayload, binaryPayloadLength);
 }
 
-void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
+void SigmaInternalPkg::init(String topic, String payload, byte qos, bool retained, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
 {
     pkgData.topic = topic;
     pkgData.payload = payload;
@@ -45,12 +45,16 @@ void SigmaInternalPkg::init(String topic, String payload, bool isBinary, String 
     pkgData.clientId = clientId;
     pkgData.binaryPayloadLength = binaryPayloadLength;
     pkgData.binaryPayload = binaryPayload;
+    pkgData.qos = qos;
+    pkgData.retained = retained;
     JsonDocument doc;
     doc["clientId"] = pkgData.clientId;
     doc["topic"] = pkgData.topic;
     doc["payload"] = pkgData.payload;
     doc["isBinary"] = pkgData.isBinary;
     doc["binaryPayloadLength"] = pkgData.binaryPayloadLength;
+    doc["qos"] = pkgData.qos;
+    doc["retained"] = pkgData.retained;
     serializeJson(doc, pkgString);
 }
 
@@ -70,13 +74,36 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         return;
     }
     int length = 0;
-    byte *binaryPayload = nullptr;
+    SigmaInternalStruct pkg0;
+    pkg0.topic = doc["topic"].as<String>();
+    pkg0.payload = doc["payload"].as<String>();
+    if (doc["clientId"].is<String>()) {
+    pkg0.clientId = doc["clientId"].as<String>();
+    } else {
+        pkg0.clientId = "";
+    }
+    if (doc["qos"].is<byte>()) {
+        pkg0.qos = doc["qos"].as<byte>();
+    } else {
+        pkg0.qos = 0;
+    }
+    if (doc["retained"].is<bool>()) {
+        pkg0.retained = doc["retained"].as<bool>();
+    } else {
+        pkg0.retained = false;
+    }
+    if (doc["binaryPayloadLength"].is<int>()) {
+        pkg0.binaryPayloadLength = doc["binaryPayloadLength"].as<int>();
+    } else {
+        pkg0.binaryPayloadLength = 0;
+    }
     if (doc["isBinary"].as<bool>())
     { // the payload contains an encoded binary
+        pkg0.isBinary = doc["isBinary"].as<bool>();
         length = GetDecodedLength(doc["payload"].as<String>().length());
-        binaryPayload = (byte *)malloc(length);
+        pkg0.binaryPayload = (byte *)malloc(length);
         this->isAllocated = true;
-        length = GetDecoded(doc["payload"].as<String>(), binaryPayload);
+        pkg0.binaryPayloadLength =  GetDecoded(doc["payload"].as<String>(), binaryPayload);
     }
     else
     {
@@ -84,7 +111,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         binaryPayload = nullptr;
     }
     // Serial.printf("payload: %s\n", doc["payload"].as<String>().c_str());
-    init(doc["topic"].as<String>(), doc["payload"].as<String>(), doc["isBinary"].as<bool>(), doc["clientId"].as<String>(), binaryPayload, length);
+    init(pkg0.topic, pkg0.payload, pkg0.qos, pkg0.retained, pkg0.isBinary, pkg0.clientId, pkg0.binaryPayload, pkg0.binaryPayloadLength);
 }
 
 SigmaInternalPkg::~SigmaInternalPkg()

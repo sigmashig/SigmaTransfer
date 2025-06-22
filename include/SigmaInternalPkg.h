@@ -19,9 +19,9 @@ class SigmaInternalPkg
 public:
     // Raw message
     // String message plain or encoded binary
-    SigmaInternalPkg(String topic, String payload, bool isBinary = false, String clientId = "");
+    SigmaInternalPkg(String topic, String payload, byte qos = 0, bool retained = false, bool isBinary = false, String clientId = "");
     // binary message. The message will be sent as binary when isBinary is true and will sent as text and the encoded binary when isBinary is false 
-    SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, bool isBinary = false, String clientId = "");
+    SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, byte qos = 0, bool retained = false, bool isBinary = false, String clientId = "");
 
 
     // prepare for deserialize
@@ -46,6 +46,8 @@ public:
     static String GetEncoded(byte *data, int length);
     static int GetDecodedLength(int length);
     static int GetDecoded(String data, byte *encodedData);
+    byte GetQos() { return pkgData.qos; };
+    bool GetRetained() { return pkgData.retained; };
 
 private:
     SigmaInternalStruct pkgData;
@@ -58,7 +60,7 @@ private:
     bool isAllocated = false;
     bool isError = false;
 
-    void init(String topic, String payload, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength);
+    void init(String topic, String payload, byte qos, bool retained, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength);
 };
 
 #endif
