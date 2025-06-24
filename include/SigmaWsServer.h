@@ -14,11 +14,6 @@
 #include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
 
-typedef struct
-{
-    String clientId;
-    String authKey;
-} AllowableClients;
 
 typedef struct
 {

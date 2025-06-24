@@ -83,6 +83,7 @@ void SigmaWsClient::Connect()
     {
         url += "?apiKey=" + config.apiKey + "&clientId=" + config.clientId;
     }
+    Log->Append("Connecting to: ").Append(url).Append(":").Append(config.port).Internal();
     wsClient.connect(url.c_str(), config.port);
 }
 
@@ -143,7 +144,7 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     }
     handshake += "\r\n";
 
-    // ws->Log->Append("Sending handshake:").Append(handshake).Internal();
+    //ws->Log->Append("Sending handshake:").Append(handshake).Internal();
 
     // Send handshake
     wsClient.add(handshake.c_str(), handshake.length());
@@ -191,8 +192,8 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     char *buf = (char *)data;
     String response = String(buf, len);
-    // ws->Log->Append("Received data from WebSocket server").Internal();
-    // ws->Log->Append(response).Internal();
+    ws->Log->Append("Received data from WebSocket server").Internal();
+    ws->Log->Append(response).Internal();
 
     if (response.indexOf("HTTP/1.1 101") >= 0 &&
         response.indexOf("Upgrade: websocket") >= 0)
@@ -206,6 +207,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
         ws->Log->Append("Opcode: ").Append(opcode).Internal();
         ws->Log->Append("Masked: ").Append(masked).Internal();
         ws->Log->Append("Payload length: ").Append(payload_len).Internal();
+        ws->Log->Append("Len: ").Append(len).Internal();
 
         // Basic WebSocket frame parsing - this is simplified
         if (len > 2)
@@ -239,6 +241,8 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             }
 
             // Extract payload if we have enough data
+            ws->Log->Append("Message:").Append((char*)bytes).Internal();
+            ws->Log->Append("HeaderLen: ").Append(headerLen).Internal();
             if (len >= headerLen + payload_len)
             {
                 String payload;
@@ -260,6 +264,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     {
                         payload = String((char *)(bytes + headerLen), payload_len);
                     }
+                    ws->Log->Printf("[%s]",payload).Debug();
                 }
                 switch (opcode)
                 {
@@ -270,7 +275,9 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
 
                     if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
                     {
+                        ws->Log->Append("Received SigmaInternalPkg").Internal();
                         SigmaInternalPkg pkg(payload);
+                        ws->Log->Append("Posting to event loop").Internal();
                         esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(&pkg), sizeof(pkg), portMAX_DELAY);
                         TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
                         if (subscription != nullptr)
@@ -407,10 +414,10 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
         Log->Append("Cannot send message - not connected").Internal();
         return false;
     }
-
     byte *payload = (byte *)_payload;
     size_t payloadLen = _payloadLen;
     String jsonStr;
+    Log->Printf("Sending frame:[%d]#%s#", opcode, _payload).Debug();
 
     if (opcode == 0x01 && config.authType & AUTH_TYPE_ALL_MESSAGES)
     {
@@ -453,6 +460,7 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
 
     // Set opcode and FIN bit
     buffer[0] = 0x80 | (opcode & 0x0F); // FIN=1, opcode
+    Log->Printf("hsize=%d,buffer[0]:0x%02x",headerSize,buffer[0]).Debug();
 
     // Set payload length and mask bit
     if (payloadLen <= 125)
@@ -490,6 +498,8 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
     }
 
     // Send frame
+    Log->Printf("Send Frame[%d]",headerSize + payloadLen).Debug();
+    Log->Printf("#%s#",(const char *)(buffer+headerSize)).Debug();
     wsClient.add((const char *)buffer, headerSize + payloadLen);
     delete[] buffer;
     return wsClient.send();

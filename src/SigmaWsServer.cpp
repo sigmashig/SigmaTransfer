@@ -10,6 +10,11 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     this->name = name;
     isReady = false;
 
+    Log->Append("SigmaWsServer: ").Append(name).Internal();
+    Log->Append("AuthType:").Append(config.authType).Internal();
+    Log->Append("MaxClients:").Append(config.maxClients).Internal();
+    Log->Append("MaxConnectionsPerClient:").Append(config.maxConnectionsPerClient).Internal();
+
     xQueue = xQueueCreate(10, sizeof(SigmaWsServerData));
     xTaskCreate(processData, "ProcessData", 4096, this, 1, NULL);
 
@@ -22,6 +27,11 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
 
     server = new AsyncWebServer(config.port);
     ws = new AsyncWebSocket(config.rootPath);
+    allowableClients.clear();
+    for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
+    {
+        AddAllowableClient(it->second.clientId, it->second.authKey);
+    }
     ws->onEvent(onWsEvent);
     clients.clear();
     server->addHandler(ws);
@@ -75,7 +85,7 @@ void SigmaWsServer::networkEventHandler(void *arg, esp_event_base_t event_base, 
 
 bool SigmaWsServer::sendMessageToClient(String clientId, String message)
 {
-
+    Log->Append("sendMessageToClient:").Append(clientId).Append("#").Append(message).Internal();
     const ClientAuth *auth = GetClientAuth(clientId);
     if (auth == nullptr || auth->isAuth == false)
     {
@@ -146,6 +156,8 @@ void SigmaWsServer::processData(void *arg)
                 server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Internal();
                 if (server->isClientLimitReached(server, data.wsClient))
                 {
+                    server->Log->Append("Client limit reached").Error();
+                    data.wsClient->close();
                     return;
                 }
 
@@ -155,6 +167,7 @@ void SigmaWsServer::processData(void *arg)
                 auth.isAuth = false;
                 auth.wsClient = data.wsClient;
                 clients[auth.clientIdInt] = auth;
+                server->Log->Printf("ClientIdInt=%u:%u", data.wsClient->id(), auth.clientIdInt).Internal();
 
                 if (server->config.authType == AUTH_TYPE_URL)
                 {
@@ -171,6 +184,9 @@ void SigmaWsServer::processData(void *arg)
                             auth.isAuth = true;
                             if (server->isConnectionLimitReached(clientId, server, data.wsClient))
                             {
+                                server->Log->Append("Connection limit reached in url").Error();
+                                data.wsClient->close();
+                                server->clients.erase(data.wsClient->id());
                                 return;
                             }
                         }
@@ -217,8 +233,10 @@ void SigmaWsServer::processData(void *arg)
 
 void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data)
 {
+    server->Log->Append("WS:").Append(data.wsClient->id()).Append(":").Append(data.frameInfo->opcode).Append("#").Internal();
+    server->Log->Append("Size::").Append(server->clients.size()).Internal();
     ClientAuth *auth = &(server->clients[data.wsClient->id()]);
-    server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->isAuth).Internal();
+    server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->clientIdInt).Append("#").Append(auth->isAuth).Internal();
     if (data.frameInfo->opcode == WS_BINARY)
     {
         if (auth->isAuth || server->config.authType == AUTH_TYPE_NONE)
@@ -239,16 +257,22 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
     {
         String payload = String((char *)data.data);
         server->Log->Append("Payload: ").Append(payload).Internal();
+        server->Log->Append("Cond1:").Append(auth->isAuth).Append("#").Append(server->config.authType == AUTH_TYPE_FIRST_MESSAGE).Append("#").Append(server->config.authType == AUTH_TYPE_ALL_MESSAGES).Internal("#");
         if ((!auth->isAuth && server->config.authType == AUTH_TYPE_FIRST_MESSAGE) || server->config.authType == AUTH_TYPE_ALL_MESSAGES)
         {
             String clientId = "";
+            server->Log->Append("AuthRequest:").Append(payload).Internal();
             if (server->clientAuthRequest(payload, clientId))
             {
+                server->Log->Append("AuthRequest:OK").Internal();
                 auth->isAuth = true;
                 auth->clientIdInt = data.wsClient->id();
                 auth->clientId = clientId;
                 if (server->isConnectionLimitReached(auth->clientId, server, data.wsClient))
                 {
+                    server->Log->Append("Connection limit reached for client:").Append(auth->clientId).Error();
+                    data.wsClient->close();
+                    server->clients.erase(data.wsClient->id());
                     return;
                 }
             }

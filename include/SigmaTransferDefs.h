@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <WiFi.h>
+#include <map>
 
 typedef enum
 {
@@ -120,6 +121,12 @@ typedef enum
 
 typedef struct
 {
+    String clientId;
+    String authKey;
+} AllowableClients;
+
+typedef struct
+{
     String host;
     uint16_t port = 80;
     String clientId = "WSClient_" + String(ESP.getEfuseMac(), HEX);
@@ -138,6 +145,7 @@ typedef struct
     byte maxClients = 10;
     byte maxConnectionsPerClient = 1;
     bool enabled = true;
+    std::map<String, AllowableClients> allowableClients;
 } WSServerConfig;
 
 typedef enum
