@@ -134,8 +134,8 @@ typedef struct
     String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
     bool enabled = true;
-    int retryAuthCount = 3;
-    int retryAuthDelay = 1000;
+    int retryConnectingCount = 3;
+    int retryConnectingDelay = 5000; // 5 second
 } WSClientConfig;
 
 typedef struct
@@ -148,6 +148,8 @@ typedef struct
     byte maxConnectionsPerClient = 1;
     bool enabled = true;
     std::map<String, AllowableClients> allowableClients;
+    int pingInterval = 60000; // 60 seconds
+    int pingRetryCount = 3; // disconnect after 3 pings
 } WSServerConfig;
 
 typedef enum

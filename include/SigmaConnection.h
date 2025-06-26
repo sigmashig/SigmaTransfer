@@ -56,6 +56,9 @@ protected:
     String name;
     esp_event_loop_handle_t eventLoop;
     SigmaLoger *Log;
+    TimerHandle_t reconnectTimer = nullptr;
+    uint retryConnectingCount = 3;
+    uint retryConnectingDelay = 1000;
 
     virtual void Disconnect() = 0;
     virtual void Close() = 0;
@@ -67,6 +70,9 @@ protected:
     void removeSubscription(String topic);
     static SigmaProtocolType String2Type(String typeName);
     static bool IsIP(String URL);
+    static void reconnectTask(TimerHandle_t xTimer);
+    void setReconnectTimer(SigmaConnection *conn);
+    void clearReconnectTimer();
 
 private:
 };

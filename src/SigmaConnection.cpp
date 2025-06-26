@@ -47,6 +47,31 @@ bool SigmaConnection::IsIP(String URL)
     return true;
 }
 
+void SigmaConnection::reconnectTask(TimerHandle_t xTimer)
+{
+    SigmaConnection *conn = (SigmaConnection *)pvTimerGetTimerID(xTimer);
+    conn->Connect();
+}
+
+void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
+{
+    if (conn->retryConnectingDelay > 0 && conn->retryConnectingCount > 0)
+    {
+        clearReconnectTimer();
+        reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
+        xTimerStart(reconnectTimer, 0);
+    }
+}
+
+void SigmaConnection::clearReconnectTimer()
+{
+    if (reconnectTimer != nullptr)
+    {
+        xTimerDelete(reconnectTimer,0);
+        reconnectTimer = nullptr;
+    }
+}
+
 SigmaConnection *SigmaConnection::Create(SigmaProtocolType type, SigmaConnectionsConfig config, SigmaLoger *logger, uint priority)
 {
     switch (type)

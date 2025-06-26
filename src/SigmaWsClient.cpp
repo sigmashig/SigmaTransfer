@@ -9,7 +9,9 @@
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", logger, priority)
 {
     config = _config;
-    this->name = name;
+ 
+    this->retryConnectingCount = config.retryConnectingCount;
+    this->retryConnectingDelay = config.retryConnectingDelay;
     // setRootTopic(config.rootTopic);
     wsClient.onConnect(onConnect, this);
     wsClient.onDisconnect(onDisconnect, this);
@@ -85,18 +87,31 @@ void SigmaWsClient::Connect()
     }
     Log->Append("Connecting to: ").Append(url).Append(":").Append(config.port).Internal();
     wsClient.connect(url.c_str(), config.port);
+    setReconnectTimer(this);
 }
 
 void SigmaWsClient::Disconnect()
 {
     sendWebSocketCloseFrame();
     wsClient.close();
+    retryConnectingCount--;
+    if (retryConnectingCount == 0)
+    {
+        Log->Append("Failed to connect to WebSocket server").Internal();
+        return;
+    }
+    else if (shouldConnect)
+    {
+        Log->Append("Retrying to connect to WebSocket server").Internal();
+        Connect();
+    }
 }
 
 void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
-
+    ws->clearReconnectTimer();
+    ws->retryConnectingCount = ws->config.retryConnectingCount;
     // Generate WebSocket key - random 16 bytes base64 encoded
     byte randomKey[16];
     for (int i = 0; i < 16; i++)
@@ -149,8 +164,8 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     wsClient.add(handshake.c_str(), handshake.length());
     if (!wsClient.send())
     {
-
         ws->Log->Append("Failed to send WebSocket handshake").Internal();
+        ws->Disconnect();
     }
     else
     {
@@ -173,12 +188,18 @@ void SigmaWsClient::setReady(bool ready)
 {
     isReady = ready;
     Log->Append("Setting ready: ").Append(ready).Internal();
+    clearReconnectTimer();
+    if (ready)
+    {
+        retryConnectingCount = config.retryConnectingCount;
+    }
     esp_event_post_to(SigmaConnection::GetEventLoop(), GetEventBase(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
 }
 
 void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
+    ws->clearReconnectTimer();
     ws->setReady(false);
 }
 
@@ -202,16 +223,11 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                 ws->sendAuthMessage();
             }
         }
-
         else
         {
             // wrong response
             ws->Log->Append("Received wrong response from WebSocket server").Internal();
             ws->Disconnect();
-            if (ws->shouldConnect)
-            {
-                ws->Connect();
-            }
         }
         return;
     }
@@ -222,12 +238,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
         byte opcode = bytes[0] & 0x0F;
         bool masked = (bytes[1] & 0x80) != 0;
         ulong payload_len = bytes[1] & 0x7F;
-        //       ws->Log->Append("Opcode: ").Append(opcode).Internal();
-        //       ws->Log->Append("Masked: ").Append(masked).Internal();
-        //       ws->Log->Append("Payload length: ").Append(payload_len).Internal();
-        //       ws->Log->Append("Len: ").Append(len).Internal();
 
-        // Basic WebSocket frame parsing - this is simplified
         if (len > 2)
         {
             bool fin = (bytes[0] & 0x80) != 0;
@@ -236,14 +247,20 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             if (payload_len == 126)
             {
                 if (len < 4)
+                {
+                    ws->Log->Append("Not enough data to parse WebSocket frame (len<4)").Internal();
                     return; // Not enough data
+                }
                 payload_len = ((uint16_t)bytes[2] << 8) | bytes[3];
                 headerLen += 2;
             }
             else if (payload_len == 127)
             {
                 if (len < 10)
+                {
+                    ws->Log->Append("Not enough data to parse WebSocket frame (len<10)").Internal();
                     return; // Not enough data
+                }
                 payload_len = 0;
                 for (int i = 0; i < 8; i++)
                 {
@@ -251,20 +268,16 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                 }
                 headerLen += 8;
             }
-
             // Skip masking key if present
             if (masked)
             {
                 headerLen += 4;
             }
-
             // Extract payload if we have enough data
-            // ws->Log->Append("Message:").Append((char *)bytes).Internal();
-            // ws->Log->Append("HeaderLen: ").Append(headerLen).Internal();
             if (len >= headerLen + payload_len)
             {
                 String payload;
-                if (opcode != 0x02)
+                if (opcode != WS_BINARY)
                 {
                     if (masked)
                     {
@@ -281,11 +294,10 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     {
                         payload = String((char *)(bytes + headerLen), payload_len);
                     }
-                    // ws->Log->Printf("[%s]", payload.c_str()).Debug();
                 }
                 switch (opcode)
                 {
-                case 0x01:
+                case WS_TEXT:
                 {
                     // Text frame
                     ws->Log->Append("Received: ").Append(payload).Internal();
@@ -304,11 +316,20 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     }
                     else
                     {
-                        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+                        if (payload.startsWith("PING") || payload.startsWith("ping"))
+                        {
+                            ws->sendWebSocketPongFrame(payload);
+                            ws->Log->Append("Received PING frame").Internal();
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+                        }
+                        else
+                        {
+                            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+                        }
                     }
                     break;
                 }
-                case 0x02:
+                case WS_BINARY:
                 { // Binary frame
                     byte *bPayload;
                     bool isFreeRequired = false;
@@ -337,19 +358,14 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     }
                     break;
                 }
-                case 0x08:
+                case WS_DISCONNECT:
                 {
                     // Close frame. Server is closing the connection. We will try to reconnect
                     ws->Log->Append("Received close frame").Internal();
-                    ws->Disconnect();
-                    // ws->setReady(false);
-                    if (ws->shouldConnect)
-                    {
-                        ws->Connect();
-                    }
+                    ws->Close();
                     break;
                 }
-                case 0x09:
+                case WS_PING:
                 {
                     // Ping frame.
                     ws->Log->Append("Received ping frame").Internal();
@@ -357,7 +373,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                     ws->sendWebSocketPongFrame(payload);
                     break;
                 }
-                case 0x0A:
+                case WS_PONG:
                 {
                     // Pong frame
                     ws->Log->Append("Received pong frame").Internal();
@@ -378,6 +394,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
             ws->Log->Append("WebSocket handshake failed").Internal();
             String error = "[" + ws->GetName() + "] " + "WebSocket handshake failed";
             esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)(error.c_str()), error.length() + 1, portMAX_DELAY);
+            ws->Disconnect();
         }
     }
 }
@@ -408,30 +425,29 @@ bool SigmaWsClient::sendWebSocketTextFrame(const String &payload, bool isAuth)
     }
     else
     {
-        Log->Debug("--------------------------------");
         Log->Append("[WS:C->S]:").Append(payload).Internal();
     }
-    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x01, isAuth);
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_TEXT, isAuth);
 }
 
 bool SigmaWsClient::sendWebSocketBinaryFrame(const byte *data, size_t size)
 {
-    return sendWebSocketFrame(data, size, 0x02);
+    return sendWebSocketFrame(data, size, WS_BINARY);
 }
 
 bool SigmaWsClient::sendWebSocketPingFrame(const String &payload)
 {
-    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x09);
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PING);
 }
 
 bool SigmaWsClient::sendWebSocketPongFrame(const String &payload)
 {
-    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), 0x0A);
+    return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PONG);
 }
 
 bool SigmaWsClient::sendWebSocketCloseFrame()
 {
-    return sendWebSocketFrame(nullptr, 0, 0x08);
+    return sendWebSocketFrame(nullptr, 0, WS_DISCONNECT);
 }
 
 bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen, byte opcode, bool isAuth)
@@ -444,12 +460,8 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
     byte *payload = (byte *)_payload;
     size_t payloadLen = _payloadLen;
     String jsonStr;
-    // Serial.println("================");
-    // Serial.println((char*)_payload);
-    // Serial.println("================");
-    // Log->Printf("Sending frame:[%d]#%s#", opcode, (char*)_payload).Debug();
 
-    if (opcode == 0x01 && config.authType & AUTH_TYPE_ALL_MESSAGES)
+    if (opcode == WS_TEXT && config.authType & AUTH_TYPE_ALL_MESSAGES)
     {
         // Convert to Json
         // Text frame

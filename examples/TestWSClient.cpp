@@ -8,7 +8,7 @@ SigmaConnection *protocol = NULL;
 
 void TestSuite1()
 {
-  String payload = "Please, respond \"topic\":\"topic1\",\"payload\":\"OK\"";
+  String payload = "Please, respond {'topic':'topic1','payload':'OK'}";
   SigmaInternalPkg pkg("topic1", payload.c_str());
   Log->Append("Sending message:").Append(pkg.GetPkgString()).Internal();
   esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length() + 1, portMAX_DELAY);
@@ -169,9 +169,9 @@ void setup()
   wsConfig.rootPath = "/";
   wsConfig.enabled = true;
   wsConfig.apiKey = "secret-api-key-12345";
-  wsConfig.retryAuthCount = 3;
-  wsConfig.retryAuthDelay = 1000;
-  wsConfig.authType = AUTH_TYPE_NONE; // AUTH_TYPE_FIRST_MESSAGE;
+  wsConfig.retryConnectingCount = 3;
+  wsConfig.retryConnectingDelay = 1000;
+  wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
 
   SigmaWsClient *wsClient = new SigmaWsClient(wsConfig, Log);
 

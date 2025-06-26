@@ -10,6 +10,7 @@
 #include "SigmaConnection.h"
 #include <AsyncTCP.h>
 #include "SigmaTransferDefs.h"
+#include <AsyncWebSocket.h>
 
 class SigmaWsClient : public SigmaConnection
 {
@@ -29,8 +30,7 @@ private:
 
     WSClientConfig config;
 
-    //    inline static std::map<String, TopicSubscription> eventMap;
-    inline static bool shouldConnect = true;
+    bool shouldConnect = true;
     inline static AsyncClient wsClient;
     static void onConnect(void *arg, AsyncClient *c);
     void sendAuthMessage();

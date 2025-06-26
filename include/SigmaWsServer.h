@@ -22,6 +22,7 @@ typedef struct
     int32_t clientIdInt;
     bool isAuth = false;
     AsyncWebSocketClient *wsClient;
+    int pingRetryCount = 3;
 } ClientAuth;
 
 typedef struct
@@ -83,6 +84,7 @@ private:
     AsyncWebServer *server;
     AsyncWebSocket *ws;
     std::map<String, AllowableClients> allowableClients;
+    TimerHandle_t pingTimer;
 
     static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
@@ -103,6 +105,7 @@ private:
     void Disconnect();
     // bool IsNetworkRequired() { return true; };
     void Close();
+    static void pingTask(TimerHandle_t xTimer);
 };
 
 #endif
