@@ -19,10 +19,9 @@ class SigmaInternalPkg
 public:
     // Raw message
     // String message plain or encoded binary
-    SigmaInternalPkg(String topic, String payload, byte qos = 0, bool retained = false, bool isBinary = false, String clientId = "");
-    // binary message. The message will be sent as binary when isBinary is true and will sent as text and the encoded binary when isBinary is false 
-    SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, byte qos = 0, bool retained = false, bool isBinary = false, String clientId = "");
-
+    SigmaInternalPkg(String topic, String payload, String clientId = "", byte qos = 0, bool retained = false, bool isBinary = false);
+    // binary message. The message will be sent as binary when isBinary is true and will sent as text and the encoded binary when isBinary is false
+    SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, String clientId = "", byte qos = 0, bool retained = false, bool isBinary = false);
 
     // prepare for deserialize
     // msg is the message received from the Sigma protocol JSON format

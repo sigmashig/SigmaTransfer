@@ -32,7 +32,7 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     allowableClients.clear();
     for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
     {
-        
+
         Log->Append("AllowableClient:").Append(it->second.clientId).Append("#first:").Append(it->first).Append("#").Append(it->second.authKey).Internal();
         AddAllowableClient(it->second.clientId, it->second.authKey);
     }
@@ -58,7 +58,6 @@ void SigmaWsServer::Connect()
     server->begin();
     setReady(true);
     Log->Append("Websocket server started").Internal();
-
 }
 
 void SigmaWsServer::Disconnect()
@@ -115,6 +114,11 @@ bool SigmaWsServer::sendMessageToClient(String clientId, String message)
     const ClientAuth *auth = GetClientAuth(clientId);
     if (auth == nullptr || auth->isAuth == false)
     {
+        Serial.printf("sendMessageToClient: auth is nullptr or isAuth is false\n");
+        for (auto it = clients.begin(); it != clients.end(); it++)
+        {
+            Serial.printf("Client ID:%s#IntId:%d#Auth:%d\n", it->second.clientId.c_str(), it->second.clientIdInt, it->second.isAuth);
+        }
         return false;
     }
     return auth->wsClient->text(message);
@@ -271,22 +275,15 @@ void SigmaWsServer::processData(void *arg)
 
 void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data)
 {
-    server->Log->Append("WS:").Append(data.wsClient->id()).Append(":").Append(data.frameInfo->opcode).Append("#").Internal();
-    server->Log->Append("Size::").Append(server->clients.size()).Internal();
-    for (auto it = server->clients.begin(); it != server->clients.end(); it++)
-    {
-        Serial.printf("Client ID:%s#IntId:%d#Auth:%d\n", it->second.clientId.c_str(), it->second.clientIdInt, it->second.isAuth);
-    }
     ClientAuth *auth = &(server->clients[data.wsClient->id()]);
     auth->pingRetryCount = server->config.pingRetryCount;
-    server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->clientIdInt).Append("#").Append(auth->isAuth).Internal();
     if (data.frameInfo->opcode == WS_BINARY)
     {
         if (auth->isAuth || server->config.authType == AUTH_TYPE_NONE)
         { // Binary format is available for authenticated clients (URL/FIRST MESSAGE) or no auth
             // Client MUST BE AUTHENTICATED before sending binary data
             // there is no check of auth attribute for AUTH_TYPE_ALL_MESSAGES
-            SigmaInternalPkg pkg("", data.data, data.len, true, auth->clientId);
+            SigmaInternalPkg pkg("", data.data, data.len, auth->clientId);
             esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
         }
         else
@@ -371,7 +368,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
 void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaWsServer *ws = (SigmaWsServer *)arg;
-    SigmaInternalPkg *pkg = (SigmaInternalPkg *)event_data;
+    SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
     if (event_id == PROTOCOL_SEND_RAW_BINARY_MESSAGE)
     {
         ws->Log->Append("Raw Binary Message Not supported for WebSocketServer!").Error();
@@ -383,26 +380,28 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
     else if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
     {
         bool res;
-        if (pkg->IsBinary())
+        if (pkg.IsBinary())
         {
-            res = ws->sendMessageToClient(pkg->GetClientId(), pkg->GetBinaryPayload(), pkg->GetBinaryPayloadLength());
+            Serial.printf("sendMessageToClient: binary\n");
+            Serial.println(pkg.GetPkgString().c_str());
+            res = ws->sendMessageToClient(pkg.GetClientId(), pkg.GetBinaryPayload(), pkg.GetBinaryPayloadLength());
         }
         else
         {
-            res = ws->sendMessageToClient(pkg->GetClientId(), pkg->GetPayload());
+            res = ws->sendMessageToClient(pkg.GetClientId(), pkg.GetPkgString());
         }
         if (!res)
         {
-            ws->Log->Append("Failed to send message to client: ").Append(pkg->GetClientId()).Error();
+            ws->Log->Append("Failed to send message to client: ").Append(pkg.GetClientId()).Error();
         }
     }
     else if (event_id == PROTOCOL_SEND_PING)
     {
-        ws->sendPingToClient(pkg->GetClientId(), pkg->GetPayload());
+        ws->sendPingToClient(pkg.GetClientId(), pkg.GetPayload());
     }
     else if (event_id == PROTOCOL_SEND_PONG)
     {
-        ws->sendPongToClient(pkg->GetClientId(), pkg->GetPayload());
+        ws->sendPongToClient(pkg.GetClientId(), pkg.GetPayload());
     }
 }
 

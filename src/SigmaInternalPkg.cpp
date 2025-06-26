@@ -3,7 +3,7 @@
 #include <libb64/cdecode.h>
 #include <libb64/cencode.h>
 
-SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, byte qos, bool retained, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, String clientId, byte qos, bool retained, bool isBinary)
 {
     int length;
     byte *binaryPayload = nullptr;
@@ -25,7 +25,7 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, String payload, byte qos, bool 
     init(topic, payload, qos, retained, isBinary, clientId, binaryPayload, length);
 }
 
-SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, byte qos, bool retained, bool isBinary, String clientId)
+SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binaryPayloadLength, String clientId, byte qos, bool retained, bool isBinary)
 {
     int length;
     String payload = "";
@@ -34,7 +34,7 @@ SigmaInternalPkg::SigmaInternalPkg(String topic, byte *binaryPayload, int binary
     payload = GetEncoded(binaryPayload, binaryPayloadLength);
     this->isAllocated = false;
 
-    init(topic, payload, qos, retained, isBinary, clientId, binaryPayload, binaryPayloadLength);
+    init(topic, payload,  qos, retained, isBinary, clientId, binaryPayload, binaryPayloadLength);
 }
 
 void SigmaInternalPkg::init(String topic, String payload, byte qos, bool retained, bool isBinary, String clientId, byte *binaryPayload, int binaryPayloadLength)
