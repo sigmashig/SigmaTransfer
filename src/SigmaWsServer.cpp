@@ -30,6 +30,8 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     allowableClients.clear();
     for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
     {
+        
+        Log->Append("AllowableClient:").Append(it->second.clientId).Append("#first:").Append(it->first).Append("#").Append(it->second.authKey).Internal();
         AddAllowableClient(it->second.clientId, it->second.authKey);
     }
     ws->onEvent(onWsEvent);
@@ -66,6 +68,7 @@ void SigmaWsServer::Disconnect()
 
 void SigmaWsServer::Close()
 {
+    Log->Append("Closing WsServer").Internal();
     shouldConnect = false;
     Disconnect();
 }
@@ -96,6 +99,7 @@ bool SigmaWsServer::sendMessageToClient(String clientId, String message)
 
 bool SigmaWsServer::sendMessageToClient(String clientId, byte *data, size_t size)
 {
+    Log->Append("sendMessageToClient(bin):").Append(clientId).Append("#").Append(size).Internal();
     const ClientAuth *auth = GetClientAuth(clientId);
     if (auth == nullptr || auth->isAuth == false)
     {
@@ -108,6 +112,7 @@ bool SigmaWsServer::sendMessageToClient(String clientId, byte *data, size_t size
 
 bool SigmaWsServer::sendPingToClient(String clientId, String payload)
 {
+    Log->Append("sendPingToClient:").Append(clientId).Append("#").Append(payload).Internal();
     const ClientAuth *auth = GetClientAuth(clientId);
     if (auth == nullptr || auth->isAuth == false)
     {
@@ -118,6 +123,7 @@ bool SigmaWsServer::sendPingToClient(String clientId, String payload)
 
 bool SigmaWsServer::sendPongToClient(String clientId, String payload)
 {
+    Log->Append("sendPongToClient:").Append(clientId).Append("#").Append(payload).Internal();
     // Webserver doesn't support pong
     return false;
 }
@@ -226,7 +232,10 @@ void SigmaWsServer::processData(void *arg)
                 break;
             }
             }
-            free(data.data);
+            if (data.data != nullptr)
+            {
+                free(data.data);
+            }
         }
     }
 }
@@ -235,6 +244,10 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
 {
     server->Log->Append("WS:").Append(data.wsClient->id()).Append(":").Append(data.frameInfo->opcode).Append("#").Internal();
     server->Log->Append("Size::").Append(server->clients.size()).Internal();
+    for (auto it = server->clients.begin(); it != server->clients.end(); it++)
+    {
+        Serial.printf("Client ID:%s#IntId:%d#Auth:%d\n", it->second.clientId.c_str(), it->second.clientIdInt, it->second.isAuth);
+    }
     ClientAuth *auth = &(server->clients[data.wsClient->id()]);
     server->Log->Append("Auth:").Append(auth->clientId).Append("#").Append(auth->clientIdInt).Append("#").Append(auth->isAuth).Internal();
     if (data.frameInfo->opcode == WS_BINARY)
@@ -370,8 +383,8 @@ bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
     }
     String cId = doc["clientId"].as<String>();
     String authKey = doc["authKey"].as<String>();
-    // Log->Append("Client ID:").Append(cId).Internal();
-    // Log->Append("Auth Key:").Append(authKey).Internal();
+    Log->Append("Client ID:").Append(cId).Internal();
+    Log->Append("Auth Key:").Append(authKey).Internal();
     if (isClientAvailable(cId, authKey))
     {
         clientId = cId;
@@ -382,7 +395,7 @@ bool SigmaWsServer::clientAuthRequest(String payload, String &clientId)
 
 bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 {
-    // Log->Append("Checking if client is available:").Append(clientId).Append("#").Append(authKey).Append("#").Internal();
+    Log->Append("Checking if client is available:").Append(clientId).Append("#").Append(authKey).Append("#").Internal();
     if (allowableClients.find(clientId) != allowableClients.end())
     {
         if (allowableClients[clientId].authKey == authKey)
@@ -402,6 +415,7 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 
 bool SigmaWsServer::isConnectionLimitReached(String clientId, SigmaWsServer *server, AsyncWebSocketClient *client)
 {
+    return false; //TODO: remove this
     uint n = 0;
 
     for (auto it = server->clients.begin(); it != server->clients.end(); it++)

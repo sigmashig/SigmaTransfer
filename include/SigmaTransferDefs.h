@@ -134,6 +134,8 @@ typedef struct
     String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
     bool enabled = true;
+    int retryAuthCount = 3;
+    int retryAuthDelay = 1000;
 } WSClientConfig;
 
 typedef struct
