@@ -302,7 +302,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             return;
         }
         server->Log->Append("Payload: ").Append(payload).Internal();
-        server->Log->Append("Cond1:").Append(auth->isAuth).Append("#").Append(server->config.authType == AUTH_TYPE_FIRST_MESSAGE).Append("#").Append(server->config.authType == AUTH_TYPE_ALL_MESSAGES).Internal("#");
+
         if ((!auth->isAuth && server->config.authType == AUTH_TYPE_FIRST_MESSAGE) || server->config.authType == AUTH_TYPE_ALL_MESSAGES)
         {
             String clientId = "";
