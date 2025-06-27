@@ -50,11 +50,14 @@ bool SigmaConnection::IsIP(String URL)
 void SigmaConnection::reconnectTask(TimerHandle_t xTimer)
 {
     SigmaConnection *conn = (SigmaConnection *)pvTimerGetTimerID(xTimer);
+    conn->retryConnectingCount--;
+    conn->Log->Append("[reconnectTask]Reconnecting:").Append(conn->retryConnectingCount).Internal();
     conn->Connect();
 }
 
 void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
 {
+    conn->Log->Append("[setReconnectTimer]:").Append(conn->retryConnectingCount).Internal();
     if (conn->retryConnectingDelay > 0 && conn->retryConnectingCount > 0)
     {
         clearReconnectTimer();

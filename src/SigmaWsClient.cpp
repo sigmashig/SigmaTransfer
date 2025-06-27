@@ -9,7 +9,7 @@
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", logger, priority)
 {
     config = _config;
- 
+
     this->retryConnectingCount = config.retryConnectingCount;
     this->retryConnectingDelay = config.retryConnectingDelay;
     // setRootTopic(config.rootTopic);
@@ -64,6 +64,7 @@ void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, 
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     if (event_id == PROTOCOL_STA_CONNECTED)
     {
+        ws->Log->Append("[networkEventHandler]Network connected").Internal();
         ws->Connect();
     }
     else if (event_id == PROTOCOL_STA_DISCONNECTED)
@@ -74,7 +75,6 @@ void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, 
 
 void SigmaWsClient::Connect()
 {
-    Log->Internal("WS connecting");
     if (!SigmaAsyncNetwork::IsConnected())
     {
         Log->Internal("WS cannot connect - network is not connected");
@@ -83,27 +83,28 @@ void SigmaWsClient::Connect()
     String url = config.host;
     if (config.authType & AUTH_TYPE_URL)
     {
-        url += "?apiKey=" + config.apiKey + "&clientId=" + config.clientId;
+        url = String((url.endsWith("/") ? "" : "/")) + "?apiKey=" + config.apiKey + "&clientId=" + config.clientId;
     }
     Log->Append("Connecting to: ").Append(url).Append(":").Append(config.port).Internal();
     wsClient.connect(url.c_str(), config.port);
-    setReconnectTimer(this);
+    // setReconnectTimer(this);
 }
 
 void SigmaWsClient::Disconnect()
 {
     sendWebSocketCloseFrame();
     wsClient.close();
-    retryConnectingCount--;
+    // retryConnectingCount--;
     if (retryConnectingCount == 0)
     {
-        Log->Append("Failed to connect to WebSocket server").Internal();
+        Log->Append("Failed to connect to WebSocket server:").Append(retryConnectingCount).Internal();
         return;
     }
     else if (shouldConnect)
     {
-        Log->Append("Retrying to connect to WebSocket server").Internal();
-        Connect();
+        Log->Append("Retrying to connect to WebSocket server:").Append(retryConnectingCount).Internal();
+        setReconnectTimer(this);
+        // Connect();
     }
 }
 
@@ -164,7 +165,7 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     wsClient.add(handshake.c_str(), handshake.length());
     if (!wsClient.send())
     {
-        ws->Log->Append("Failed to send WebSocket handshake").Internal();
+        ws->Log->Append("[onconnect]Failed to send WebSocket handshake").Internal();
         ws->Disconnect();
     }
     else
@@ -200,7 +201,9 @@ void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     ws->clearReconnectTimer();
-    ws->setReady(false);
+    ws->Log->Append("[ondisconnect]Disconnected from WebSocket server").Internal();
+    ws->Disconnect();
+    // ws->setReady(false);
 }
 
 void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
@@ -226,7 +229,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
         else
         {
             // wrong response
-            ws->Log->Append("Received wrong response from WebSocket server").Internal();
+            ws->Log->Append("[ondata]Received wrong response from WebSocket server").Internal();
             ws->Disconnect();
         }
         return;
@@ -361,8 +364,8 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
                 case WS_DISCONNECT:
                 {
                     // Close frame. Server is closing the connection. We will try to reconnect
-                    ws->Log->Append("Received close frame").Internal();
-                    ws->Close();
+                    ws->Log->Append("[opcode=WS_DISCONNECT]Received close frame").Internal();
+                    ws->Disconnect();
                     break;
                 }
                 case WS_PING:

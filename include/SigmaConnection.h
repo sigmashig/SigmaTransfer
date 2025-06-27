@@ -57,7 +57,7 @@ protected:
     esp_event_loop_handle_t eventLoop;
     SigmaLoger *Log;
     TimerHandle_t reconnectTimer = nullptr;
-    uint retryConnectingCount = 3;
+    int retryConnectingCount = 3;
     uint retryConnectingDelay = 1000;
 
     virtual void Disconnect() = 0;
