@@ -12,12 +12,21 @@
 #include "SigmaTransferDefs.h"
 #include <AsyncWebSocket.h>
 
+
+
 class SigmaWsClient : public SigmaConnection
 {
 public:
+    // Authentication:
+    // URL: add ?clientId=clientId&authKey=authKey&pingType=NO_PING
+    // Basic: ...will be added later...
+    // First Message: {"type":"auth","authKey":"secret-api-key-12345","clientId":"RM_C_Green01","pingType":"NO_PING"}
+    // All Messages: JSON ONLY {"type":"auth","authKey":"secret-api-key-12345","clientId":"RM_C_Green01","pingType":"NO_PING", "data":"{your data as json}"}
+    //
+    // This client automatically sends pong (binary) to the server by ping request
+    // "pingType" is optional. If not provided, it will be set to NO_PING.
+    //            available values: NO_PING, PING_ONLY_TEXT, PING_ONLY_BINARY
     SigmaWsClient(WSClientConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
-    // void Subscribe(TopicSubscription subscriptionTopic);
-    // void Unsubscribe(String topic);
 
 private:
     void Connect();

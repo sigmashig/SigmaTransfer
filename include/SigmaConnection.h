@@ -72,7 +72,7 @@ protected:
     static bool IsIP(String URL);
     static void reconnectTask(TimerHandle_t xTimer);
     void setReconnectTimer(SigmaConnection *conn);
-    void clearReconnectTimer();
+    void clearReconnectTimer(SigmaConnection *conn);
 
 private:
 };

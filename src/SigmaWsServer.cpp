@@ -7,7 +7,6 @@
 SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaConnection("SigmaWsServer", logger, priority)
 {
     this->config = config;
-    this->name = name;
     isReady = false;
 
     Log->Append("SigmaWsServer: ").Append(name).Internal();
@@ -25,7 +24,12 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 
-    pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval), pdTRUE, this, pingTask);
+    if (config.pingInterval > 0)
+    {
+        Log->Append("Start Ping timer").Internal();
+        pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval), pdTRUE, this, pingTask);
+        xTimerStart(pingTimer, 0);
+    }
 
     server = new AsyncWebServer(config.port);
     ws = new AsyncWebSocket(config.rootPath);
@@ -57,7 +61,7 @@ void SigmaWsServer::Connect()
     }
     server->begin();
     setReady(true);
-    Log->Append("Websocket server started").Internal();
+    Log->Append("Websocket server started. Waiting for clients...").Info();
 }
 
 void SigmaWsServer::Disconnect()
@@ -73,7 +77,7 @@ void SigmaWsServer::Disconnect()
 
 void SigmaWsServer::Close()
 {
-    Log->Append("Closing WsServer").Internal();
+    Log->Append("Closing WsServer").Info();
     shouldConnect = false;
     Disconnect();
 }
@@ -84,13 +88,32 @@ void SigmaWsServer::pingTask(TimerHandle_t xTimer)
     server->Log->Append("PingTask").Internal();
     for (auto it = server->clients.begin(); it != server->clients.end(); it++)
     {
-        server->sendPingToClient(it->second.clientId, "PING");
+        // server->Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
+        if (it->second.pingType == NO_PING)
+        {
+            continue;
+        }
+        server->Log->Append("Sending ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Internal();
+        //it->second.pingRetryCount--;
+        bool res = false;
+        if (it->second.pingType == PING_ONLY_TEXT)
+        {
+            res = server->sendMessageToClient(it->second, "PING");
+        }
+        else if (it->second.pingType == PING_ONLY_BINARY)
+        {
+            res = server->sendPingToClient(it->second, "PING");
+        }
+        if (!res)
+        {
+            server->Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
+        }
         it->second.pingRetryCount--;
-        if (it->second.pingRetryCount == 0)
+        if (it->second.pingRetryCount <= 0)
         {
             server->Log->Append("Client " + it->second.clientId + " disconnected due to ping timeout").Error();
             it->second.wsClient->close();
-            server->clients.erase(it->second.clientIdInt);
+            server->clients.erase(it->second.clientNumber);
         }
     }
 }
@@ -104,8 +127,18 @@ void SigmaWsServer::networkEventHandler(void *arg, esp_event_base_t event_base, 
     }
     else if (event_id == PROTOCOL_STA_DISCONNECTED)
     {
-        ws->setReady(false);
+        // ws->setReady(false);
+        ws->Disconnect();
     }
+}
+bool SigmaWsServer::sendMessageToClient(int32_t clientNumber, String message)
+{
+    return sendMessageToClient(clients[clientNumber], message);
+}
+
+bool SigmaWsServer::sendMessageToClient(ClientAuth auth, String message)
+{
+    return auth.wsClient->text(message);
 }
 
 bool SigmaWsServer::sendMessageToClient(String clientId, String message)
@@ -115,13 +148,9 @@ bool SigmaWsServer::sendMessageToClient(String clientId, String message)
     if (auth == nullptr || auth->isAuth == false)
     {
         Serial.printf("sendMessageToClient: auth is nullptr or isAuth is false\n");
-        for (auto it = clients.begin(); it != clients.end(); it++)
-        {
-            Serial.printf("Client ID:%s#IntId:%d#Auth:%d\n", it->second.clientId.c_str(), it->second.clientIdInt, it->second.isAuth);
-        }
         return false;
     }
-    return auth->wsClient->text(message);
+    return sendMessageToClient(*auth, message);
 }
 
 bool SigmaWsServer::sendMessageToClient(String clientId, byte *data, size_t size)
@@ -137,32 +166,59 @@ bool SigmaWsServer::sendMessageToClient(String clientId, byte *data, size_t size
     return auth->wsClient->binary(buffer);
 }
 
+bool SigmaWsServer::sendPingToClient(ClientAuth auth, String payload)
+{
+    return auth.wsClient->ping((byte *)(payload.c_str()), payload.length());
+}
+
 bool SigmaWsServer::sendPingToClient(String clientId, String payload)
 {
     Log->Append("sendPingToClient:").Append(clientId).Append("#").Append(payload).Internal();
     const ClientAuth *auth = GetClientAuth(clientId);
     if (auth == nullptr || auth->isAuth == false)
     {
+        Log->Append("auth is nullptr or isAuth is false").Error();
         return false;
     }
-    return auth->wsClient->ping((byte *)(payload.c_str()), payload.length());
+    return sendPingToClient(*auth, payload);
+}
+
+bool SigmaWsServer::sendPongToClient(ClientAuth auth, String payload)
+{
+    if (auth.pingType == PING_ONLY_BINARY)
+    { // server doesn't support binary pong
+        return false;
+    }
+    return auth.wsClient->text("PONG " + payload);
 }
 
 bool SigmaWsServer::sendPongToClient(String clientId, String payload)
 {
     Log->Append("sendPongToClient:").Append(clientId).Append("#").Append(payload).Internal();
-    // Webserver doesn't support pong
-    return false;
+    const ClientAuth *auth = GetClientAuth(clientId);
+    if (auth == nullptr || auth->isAuth == false)
+    {
+        Log->Append("auth is nullptr or isAuth is false").Error();
+        return false;
+    }
+    return sendPongToClient(*auth, payload);
 }
 
 void SigmaWsServer::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
 {
+    // for ping/pong frames arg and data are nullptr
     AwsFrameInfo frameInfo;
-    memcpy(&frameInfo, arg, sizeof(AwsFrameInfo));
-    byte *payload = (byte *)malloc(len + 1); // 1 byte for null terminator
-    memcpy(payload, data, len);
-    payload[len] = '\0'; // null terminator even if it's not a string
-
+    if (arg != nullptr)
+    {
+        memcpy(&frameInfo, arg, sizeof(AwsFrameInfo));
+    }
+    byte *payload = nullptr;
+    if (data != nullptr)
+    {
+        payload = (byte *)malloc(len + 1); // 1 byte for null terminator
+        memcpy(payload, data, len);
+        payload[len] = '\0'; // null terminator even if it's not a string
+    }
     SigmaWsServerData message;
     message.wsServer = server;
     message.wsClient = client;
@@ -186,7 +242,7 @@ void SigmaWsServer::processData(void *arg)
             {
             case WS_EVT_CONNECT:
             {
-                server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Internal();
+                server->Log->Printf("WebSocket client #%u connected from %s\n", data.wsClient->id(), data.wsClient->remoteIP().toString().c_str()).Info();
                 if (server->isClientLimitReached(server, data.wsClient))
                 {
                     server->Log->Append("Client limit reached").Error();
@@ -196,12 +252,12 @@ void SigmaWsServer::processData(void *arg)
 
                 ClientAuth auth;
                 auth.clientId = "";
-                auth.clientIdInt = data.wsClient->id();
+                auth.clientNumber = data.wsClient->id();
                 auth.isAuth = false;
                 auth.wsClient = data.wsClient;
                 auth.pingRetryCount = server->config.pingRetryCount;
-                clients[auth.clientIdInt] = auth;
-                server->Log->Printf("ClientIdInt=%u:%u", data.wsClient->id(), auth.clientIdInt).Internal();
+                auth.pingType = PingType::PING_ONLY_BINARY;
+                clients[auth.clientNumber] = auth;
 
                 if (server->config.authType == AUTH_TYPE_URL)
                 {
@@ -210,8 +266,8 @@ void SigmaWsServer::processData(void *arg)
                     if (i != -1)
                     {
                         String params = url.substring(i + 1);
-                        String clientId = params.substring(params.indexOf("clientId=") + 9, params.indexOf("&"));
-                        String authKey = params.substring(params.indexOf("apiKey=") + 7);
+                        String clientId = params.substring(params.indexOf("clientId=") + String("clientId=").length(), params.indexOf("&"));
+                        String authKey = params.substring(params.indexOf("apiKey=") + String("apiKey=").length());
                         if (server->isClientAvailable(clientId, authKey))
                         {
                             auth.clientId = clientId;
@@ -229,7 +285,6 @@ void SigmaWsServer::processData(void *arg)
                             server->Log->Printf("Client %s not found or auth key does not match\n", clientId.c_str()).Error();
                             data.wsClient->close();
                             server->clients.erase(data.wsClient->id());
-                            // return;
                         }
                     }
                     else
@@ -237,14 +292,13 @@ void SigmaWsServer::processData(void *arg)
                         server->Log->Error("No auth key found in url\n");
                         data.wsClient->close();
                         server->clients.erase(data.wsClient->id());
-                        // return;
                     }
                 }
                 break;
             }
             case WS_EVT_DISCONNECT:
             {
-                server->Log->Printf("WebSocket client #%u disconnected\n", data.wsClient->id()).Internal();
+                server->Log->Printf("WebSocket client #%u disconnected\n", data.wsClient->id()).Info();
                 server->clients.erase(data.wsClient->id());
                 break;
             }
@@ -260,8 +314,23 @@ void SigmaWsServer::processData(void *arg)
                 break;
             }
             case WS_EVT_PING:
+            {
+                server->Log->Append("Received PING frame").Internal();
+                if (server->clients.find(data.wsClient->id()) != server->clients.end())
+                {
+                    server->clients[data.wsClient->id()].pingRetryCount = server->config.pingRetryCount;
+                    server->sendPongToClient(server->clients[data.wsClient->id()], "PONG");
+                }
+                break;
+            }
             case WS_EVT_ERROR:
             {
+                server->Log->Append("WebSocket error").Error();
+                break;
+            }
+            default:
+            {
+                server->Log->Append("Unknown event type:").Append(data.type).Error();
                 break;
             }
             }
@@ -293,12 +362,19 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             server->clients.erase(data.wsClient->id());
         }
     }
+    else if (data.frameInfo->opcode == WS_DISCONNECT)
+    {
+        server->Log->Append("Received CLOSE frame").Internal();
+        data.wsClient->close();
+        server->clients.erase(data.wsClient->id());
+    }
     else if (data.frameInfo->opcode == WS_TEXT)
     {
         String payload = String((char *)data.data);
         if (payload.startsWith("PONG") || payload.startsWith("pong"))
         {
             server->Log->Append("Received PONG frame").Internal();
+            server->clients[data.wsClient->id()].pingRetryCount = server->config.pingRetryCount;
             return;
         }
         server->Log->Append("Payload: ").Append(payload).Internal();
@@ -311,8 +387,9 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             {
                 server->Log->Append("AuthRequest:OK").Internal();
                 auth->isAuth = true;
-                auth->clientIdInt = data.wsClient->id();
+                auth->clientNumber = data.wsClient->id();
                 auth->clientId = clientId;
+                auth->pingType = server->allowableClients[clientId].pingType;
                 if (server->isConnectionLimitReached(auth->clientId, server, data.wsClient))
                 {
                     server->Log->Append("Connection limit reached for client:").Append(auth->clientId).Error();
@@ -434,16 +511,16 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
     {
         if (allowableClients[clientId].authKey == authKey)
         {
-            Log->Append("Client authenticated").Internal();
+            Log->Append("Client:").Append(clientId).Append(" allowed").Internal();
             return true;
         }
         else
         {
-            Log->Append("Client not authenticated").Internal();
+            Log->Append("Client:").Append(clientId).Append(" doesn't allowed").Error();
             return false;
         }
     }
-    Log->Append("Client not found").Internal();
+    Log->Append("Client:").Append(clientId).Append(" not found").Internal();
     return false;
 }
 
@@ -464,7 +541,7 @@ bool SigmaWsServer::isConnectionLimitReached(String clientId, SigmaWsServer *ser
             {
                 server->Log->Printf("Client %s already connected. The previous connection is closed.\n", clientId.c_str()).Error();
                 client->close();
-                server->clients.erase(it->second.clientIdInt);
+                server->clients.erase(it->second.clientNumber);
                 return true;
             }
         }
@@ -480,7 +557,7 @@ bool SigmaWsServer::isClientLimitReached(SigmaWsServer *server, AsyncWebSocketCl
     }
     if (server->clients.size() > server->config.maxClients)
     {
-        server->Log->Printf("Max clients reached").Error();
+        server->Log->Append("Max clients has been reached").Error();
         client->close();
         server->clients.erase(client->id());
         return true;

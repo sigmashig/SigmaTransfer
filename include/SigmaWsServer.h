@@ -14,13 +14,12 @@
 #include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
 
-
 typedef struct
 {
-    String clientId;
-    // String authKey;
-    int32_t clientIdInt;
+    String clientId; // the string ID as provided by client
+    int32_t clientNumber;
     bool isAuth = false;
+    PingType pingType = NO_PING;
     AsyncWebSocketClient *wsClient;
     int pingRetryCount = 3;
 } ClientAuth;
@@ -38,19 +37,32 @@ typedef struct
 class SigmaWsServer : public SigmaConnection
 {
 public:
+    // Authentication:
+    // URL: add ?clientId=clientId&authKey=authKey&pingType=NO_PING
+    // Basic: ...will be added later...
+    // First Message: {"type":"auth","authKey":"secret-api-key-12345","clientId":"RM_C_Green01"}
+    // All Messages: JSON ONLY {"type":"auth","authKey":"secret-api-key-12345","clientId":"RM_C_Green01", "data":"{your data as json}"}
+    // The allowable clients should be added before the connection is established
+    // The clientId is the string ID as provided by client
+    // The authKey is the key to authenticate the client
+    // The pingType is the type of ping to send to the client
+    // The pingType is optional. If not provided, it will be set to PING_ONLY_TEXT.
+    //            available values: NO_PING, PING_ONLY_TEXT, PING_ONLY_BINARY
+    // The data is the data to send to the client
+
     SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority = 5);
     ~SigmaWsServer();
-    // void Subscribe(TopicSubscription subscriptionTopic) {};
-    // void Unsubscribe(String topic) {};
 
-    void AddAllowableClient(String clientId, String authKey)
+    void AddAllowableClient(String clientId, String authKey, PingType pingType = PING_ONLY_TEXT)
     {
-        AllowableClients client;
+        AllowableClient client;
         client.clientId = clientId;
         client.authKey = authKey;
+        client.pingType = pingType;
         allowableClients[clientId] = client;
     }
-    void AddAllowableClient(AllowableClients client)
+
+    void AddAllowableClient(AllowableClient client)
     {
         allowableClients[client.clientId] = client;
     }
@@ -70,26 +82,26 @@ public:
         return nullptr;
     }
     bool sendMessageToClient(String clientId, String message);
+    bool sendMessageToClient(ClientAuth auth, String message);
     bool sendMessageToClient(String clientId, byte *data, size_t size);
     bool sendPingToClient(String clientId, String payload);
+    bool sendPingToClient(ClientAuth auth, String payload);
     bool sendPongToClient(String clientId, String payload);
+    bool sendPongToClient(ClientAuth auth, String payload);
     void setReady(bool ready) { isReady = ready; };
 
 private:
-    // SigmaLoger *Log = new SigmaLoger(512);
     WSServerConfig config;
 
-    std::map<String, TopicSubscription> eventMap;
-    // inline static bool shouldConnect = true;
     AsyncWebServer *server;
     AsyncWebSocket *ws;
-    std::map<String, AllowableClients> allowableClients;
+    std::map<String, AllowableClient> allowableClients; // clientId -> AllowableClients
     TimerHandle_t pingTimer;
 
     static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    inline static std::map<int32_t, ClientAuth> clients;
+    inline static std::map<int32_t, ClientAuth> clients; // clientNumber -> ClientAuth
     bool clientAuthRequest(String payload, String &clientId);
     bool isClientAvailable(String clientId, String authKey);
 
@@ -100,6 +112,8 @@ private:
     static void processData(void *arg);
     inline static QueueHandle_t xQueue;
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+
+    bool sendMessageToClient(int32_t clientNumber, String message);
     bool shouldConnect = true;
     void Connect();
     void Disconnect();

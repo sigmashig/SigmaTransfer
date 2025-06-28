@@ -121,12 +121,6 @@ typedef enum
 
 typedef struct
 {
-    String clientId;
-    String authKey;
-} AllowableClients;
-
-typedef struct
-{
     String host;
     uint16_t port = 80;
     String clientId = "WSClient_" + String(ESP.getEfuseMac(), HEX);
@@ -138,18 +132,31 @@ typedef struct
     int retryConnectingDelay = 5000; // 5 second
 } WSClientConfig;
 
+typedef enum
+{
+    NO_PING = 0,
+    PING_ONLY_TEXT = 1,
+    PING_ONLY_BINARY = 2,
+} PingType;
+
+typedef struct
+{
+    String clientId;
+    String authKey;
+    PingType pingType = PING_ONLY_TEXT;
+} AllowableClient;
+
 typedef struct
 {
     uint16_t port = 80;
     String rootPath = "/";
-    // String apiKey = "";
     byte authType = AUTH_TYPE_NONE;
     byte maxClients = 10;
     byte maxConnectionsPerClient = 1;
     bool enabled = true;
-    std::map<String, AllowableClients> allowableClients;
+    std::map<String, AllowableClient> allowableClients;
     int pingInterval = 60000; // 60 seconds
-    int pingRetryCount = 3; // disconnect after 3 pings
+    int pingRetryCount = 3;   // disconnect after 3 pings
 } WSServerConfig;
 
 typedef enum
@@ -170,3 +177,4 @@ typedef struct
     WSClientConfig wsClientConfig;
     WSServerConfig wsServerConfig;
 } SigmaConnectionsConfig;
+

@@ -12,7 +12,6 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
 
     this->retryConnectingCount = config.retryConnectingCount;
     this->retryConnectingDelay = config.retryConnectingDelay;
-    // setRootTopic(config.rootTopic);
     wsClient.onConnect(onConnect, this);
     wsClient.onDisconnect(onDisconnect, this);
     wsClient.onData(onData, this);
@@ -23,7 +22,7 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    // esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
+    esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 }
 
@@ -111,7 +110,7 @@ void SigmaWsClient::Disconnect()
 void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
-    ws->clearReconnectTimer();
+    ws->clearReconnectTimer(ws);
     ws->retryConnectingCount = ws->config.retryConnectingCount;
     // Generate WebSocket key - random 16 bytes base64 encoded
     byte randomKey[16];
@@ -171,6 +170,7 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     else
     {
         ws->Log->Append("Connection request sent. Waiting for response from server").Internal();
+        ws->setReconnectTimer(ws);
     }
 }
 
@@ -189,7 +189,7 @@ void SigmaWsClient::setReady(bool ready)
 {
     isReady = ready;
     Log->Append("Setting ready: ").Append(ready).Internal();
-    clearReconnectTimer();
+    clearReconnectTimer(this);
     if (ready)
     {
         retryConnectingCount = config.retryConnectingCount;
@@ -200,7 +200,7 @@ void SigmaWsClient::setReady(bool ready)
 void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
-    ws->clearReconnectTimer();
+    ws->clearReconnectTimer(ws);
     ws->Log->Append("[ondisconnect]Disconnected from WebSocket server").Internal();
     ws->Disconnect();
     // ws->setReady(false);
@@ -209,9 +209,10 @@ void SigmaWsClient::onDisconnect(void *arg, AsyncClient *c)
 void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
+    ws->clearReconnectTimer(ws);
     char *buf = (char *)data;
     String response = String(buf, len);
-    // ws->Log->Append("Received data from WebSocket server:#").Append(len).Append("#").Internal();
+    ws->Log->Append("Received data from WebSocket server:#").Append(len).Append("#").Append(response).Internal();
 
     if (!ws->isReady)
     {
@@ -457,7 +458,7 @@ bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen,
 {
     if (!isReady && !isAuth)
     {
-        Log->Append("Cannot send message - not connected").Internal();
+        Log->Append("Cannot send message - not connected").Error();
         return false;
     }
     byte *payload = (byte *)_payload;

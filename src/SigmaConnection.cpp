@@ -60,18 +60,18 @@ void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
     conn->Log->Append("[setReconnectTimer]:").Append(conn->retryConnectingCount).Internal();
     if (conn->retryConnectingDelay > 0 && conn->retryConnectingCount > 0)
     {
-        clearReconnectTimer();
-        reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
-        xTimerStart(reconnectTimer, 0);
+        clearReconnectTimer(conn);
+        conn->reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
+        xTimerStart(conn->reconnectTimer, 0);
     }
 }
 
-void SigmaConnection::clearReconnectTimer()
+void SigmaConnection::clearReconnectTimer(SigmaConnection *conn)
 {
-    if (reconnectTimer != nullptr)
+    if (conn->reconnectTimer != nullptr)
     {
-        xTimerDelete(reconnectTimer,0);
-        reconnectTimer = nullptr;
+        xTimerDelete(conn->reconnectTimer, 0);
+        conn->reconnectTimer = nullptr;
     }
 }
 
