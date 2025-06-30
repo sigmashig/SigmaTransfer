@@ -27,6 +27,7 @@ private:
         shouldConnect = false;
         Disconnect();
     };
+    void sendPing() { /* nothing todo */ };
     bool shouldConnect = false;
     esp_mqtt_client_handle_t mqttClient;
     static void onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);

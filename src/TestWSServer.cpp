@@ -168,7 +168,7 @@ void setup()
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
     exit(1);
   }
-  Log->Append("Creating WS Client").Internal();
+  Log->Append("Creating WS Server").Internal();
 
   WSServerConfig wsServerConfig;
   wsServerConfig.port = 8080;

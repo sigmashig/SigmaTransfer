@@ -57,6 +57,9 @@ protected:
     esp_event_loop_handle_t eventLoop;
     SigmaLoger *Log;
     TimerHandle_t reconnectTimer = nullptr;
+    TimerHandle_t pingTimer = nullptr;
+    int pingInterval = 60000; // 60 seconds
+    //int pingRetryCount = 3;   // disconnect after 3 pings when applicable
     int retryConnectingCount = 3;
     uint retryConnectingDelay = 1000;
 
@@ -64,6 +67,8 @@ protected:
     virtual void Close() = 0;
     virtual void Connect() = 0;
     virtual void setReady(bool ready) { isReady = ready; };
+    virtual void sendPing() = 0;
+    //virtual void clearReconnect() = 0;
     void setRootTopic(String rootTopic) { this->rootTopic = rootTopic; };
     TopicSubscription *GetSubscription(String topic);
     void addSubscription(TopicSubscription subscription);
@@ -72,7 +77,11 @@ protected:
     static bool IsIP(String URL);
     static void reconnectTask(TimerHandle_t xTimer);
     void setReconnectTimer(SigmaConnection *conn);
+    static void pingTask(TimerHandle_t xTimer);
     void clearReconnectTimer(SigmaConnection *conn);
+
+    void setPingTimer(SigmaConnection *conn);
+    void clearPingTimer(SigmaConnection *conn);
 
 private:
 };

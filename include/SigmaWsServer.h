@@ -96,7 +96,8 @@ private:
     AsyncWebServer *server;
     AsyncWebSocket *ws;
     std::map<String, AllowableClient> allowableClients; // clientId -> AllowableClients
-    TimerHandle_t pingTimer;
+
+    void clearReconnect(){/*nothing todo */};
 
     static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
@@ -117,9 +118,8 @@ private:
     bool shouldConnect = true;
     void Connect();
     void Disconnect();
-    // bool IsNetworkRequired() { return true; };
     void Close();
-    static void pingTask(TimerHandle_t xTimer);
+    void sendPing();
 };
 
 #endif

@@ -29,18 +29,20 @@ public:
     SigmaWsClient(WSClientConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
 
 private:
+    WSClientConfig config;
+    inline static AsyncClient wsClient;
+    bool shouldConnect = true;
+    int pingRetryCount = 0;
+
     void Connect();
     void Disconnect();
+    void sendPing();
     void Close()
     {
         shouldConnect = false;
         Disconnect();
     };
 
-    WSClientConfig config;
-
-    bool shouldConnect = true;
-    inline static AsyncClient wsClient;
     static void onConnect(void *arg, AsyncClient *c);
     void sendAuthMessage();
     static void onDisconnect(void *arg, AsyncClient *c);

@@ -9,9 +9,11 @@
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", logger, priority)
 {
     config = _config;
+    retryConnectingCount = config.retryConnectingCount;
+    retryConnectingDelay = config.retryConnectingDelay;
+    pingInterval = config.pingInterval;
+    pingRetryCount = config.pingRetryCount;
 
-    this->retryConnectingCount = config.retryConnectingCount;
-    this->retryConnectingDelay = config.retryConnectingDelay;
     wsClient.onConnect(onConnect, this);
     wsClient.onDisconnect(onDisconnect, this);
     wsClient.onData(onData, this);
@@ -24,6 +26,8 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
     esp_event_handler_register_with(eventLoop, ESP_EVENT_ANY_BASE, PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
+
+    pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval), pdTRUE, this, pingTask);
 }
 
 void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -56,6 +60,14 @@ void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base,
         String *payload = (String *)event_data;
         ws->sendWebSocketPongFrame(*payload);
     }
+    else if (event_id == PROTOCOL_SEND_RECONNECT)
+    {
+        ws->Disconnect();
+    }
+    else if (event_id == PROTOCOL_SEND_CLOSE)
+    {
+        ws->Close();
+    }
 }
 
 void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -65,6 +77,7 @@ void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, 
     {
         ws->Log->Append("[networkEventHandler]Network connected").Internal();
         ws->Connect();
+        ws->clearReconnectTimer(ws);
     }
     else if (event_id == PROTOCOL_STA_DISCONNECTED)
     {
@@ -86,24 +99,42 @@ void SigmaWsClient::Connect()
     }
     Log->Append("Connecting to: ").Append(url).Append(":").Append(config.port).Internal();
     wsClient.connect(url.c_str(), config.port);
-    // setReconnectTimer(this);
+    retryConnectingCount = config.retryConnectingCount;
+    pingRetryCount = config.pingRetryCount;
+    setReconnectTimer(this);
 }
 
 void SigmaWsClient::Disconnect()
 {
     sendWebSocketCloseFrame();
     wsClient.close();
-    // retryConnectingCount--;
-    if (retryConnectingCount == 0)
+    if (retryConnectingCount <= 0)
     {
         Log->Append("Failed to connect to WebSocket server:").Append(retryConnectingCount).Internal();
         return;
     }
-    else if (shouldConnect)
+    if (shouldConnect)
     {
         Log->Append("Retrying to connect to WebSocket server:").Append(retryConnectingCount).Internal();
         setReconnectTimer(this);
-        // Connect();
+    }
+    else
+    {
+        clearPingTimer(this);
+    }
+}
+
+void SigmaWsClient::sendPing()
+{
+    if (pingRetryCount <= 0)
+    {
+        Disconnect();
+        esp_event_post_to(GetEventLoop(), GetEventBase(), PROTOCOL_PING_TIMEOUT, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
+    }
+    else
+    {
+        pingRetryCount--;
+        sendWebSocketPingFrame("PING");
     }
 }
 
@@ -112,6 +143,7 @@ void SigmaWsClient::onConnect(void *arg, AsyncClient *c)
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     ws->clearReconnectTimer(ws);
     ws->retryConnectingCount = ws->config.retryConnectingCount;
+    ws->pingRetryCount = ws->config.pingRetryCount;
     // Generate WebSocket key - random 16 bytes base64 encoded
     byte randomKey[16];
     for (int i = 0; i < 16; i++)
@@ -210,6 +242,7 @@ void SigmaWsClient::onData(void *arg, AsyncClient *c, void *data, size_t len)
 {
     SigmaWsClient *ws = (SigmaWsClient *)arg;
     ws->clearReconnectTimer(ws);
+    ws->pingRetryCount = ws->config.pingRetryCount;
     char *buf = (char *)data;
     String response = String(buf, len);
     ws->Log->Append("Received data from WebSocket server:#").Append(len).Append("#").Append(response).Internal();

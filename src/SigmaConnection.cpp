@@ -55,14 +55,23 @@ void SigmaConnection::reconnectTask(TimerHandle_t xTimer)
     conn->Connect();
 }
 
+void SigmaConnection::pingTask(TimerHandle_t xTimer)
+{
+    SigmaConnection *conn = (SigmaConnection *)pvTimerGetTimerID(xTimer);
+    conn->sendPing();
+}
+
 void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
 {
     conn->Log->Append("[setReconnectTimer]:").Append(conn->retryConnectingCount).Internal();
     if (conn->retryConnectingDelay > 0 && conn->retryConnectingCount > 0)
     {
         clearReconnectTimer(conn);
-        conn->reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
-        xTimerStart(conn->reconnectTimer, 0);
+        if (conn->reconnectTimer == nullptr)
+        {
+            conn->reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
+        }
+        xTimerReset(conn->reconnectTimer, 0);
     }
 }
 
@@ -70,8 +79,29 @@ void SigmaConnection::clearReconnectTimer(SigmaConnection *conn)
 {
     if (conn->reconnectTimer != nullptr)
     {
-        xTimerDelete(conn->reconnectTimer, 0);
-        conn->reconnectTimer = nullptr;
+        xTimerStop(conn->reconnectTimer, 0);
+ //       conn->reconnectTimer = nullptr;
+    }
+}
+
+void SigmaConnection::setPingTimer(SigmaConnection *conn)
+{
+    conn->Log->Append("[setPingTimer]:").Append(conn->pingInterval).Internal();
+    if (conn->pingInterval > 0)
+    {
+        if (conn->pingTimer == nullptr)
+        {
+            conn->pingTimer = xTimerCreate("pingTimer", pdMS_TO_TICKS(conn->pingInterval), pdTRUE, conn, pingTask);
+        }
+        xTimerReset(conn->pingTimer, 0);
+    }
+}
+
+void SigmaConnection::clearPingTimer(SigmaConnection *conn)
+{
+    if (conn->pingTimer != nullptr)
+    {
+        xTimerStop(conn->pingTimer, 0);
     }
 }
 

@@ -11,6 +11,8 @@ ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaMQTT", logger, priority)
 {
     this->config = config;
+    pingInterval = 0; // MQTT doesn't support ping at this moment
+
     esp_mqtt_client_config_t mqtt_cfg;
     memset(&mqtt_cfg, 0, sizeof(mqtt_cfg));
     esp_err_t err;

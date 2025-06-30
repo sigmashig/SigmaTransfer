@@ -127,6 +127,10 @@ void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
   {
     Log->Append("PROTOCOL_RECEIVED_PONG").Internal();
   }
+  else if (event_id = PROTOCOL_PING_TIMEOUT)
+  {
+    Log->Append("PROTOCOL_PING_TIMEOUT").Internal();
+  }
   else
   {
     Log->Internal("Unknown event");
@@ -169,8 +173,7 @@ void setup()
   wsConfig.rootPath = "/";
   wsConfig.enabled = true;
   wsConfig.apiKey = "secret-api-key-12345";
-  wsConfig.retryConnectingCount = 3;
-  wsConfig.retryConnectingDelay = 1000;
+  wsConfig.pingInterval = 10000;
   wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
 
   SigmaWsClient *wsClient = new SigmaWsClient(wsConfig, Log);

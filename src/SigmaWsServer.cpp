@@ -3,12 +3,16 @@
 #include "SigmaAsyncNetwork.h"
 #include <esp_event.h>
 #include <ArduinoJson.h>
+#include <vector>
 
 SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaConnection("SigmaWsServer", logger, priority)
 {
     this->config = config;
     isReady = false;
-
+    pingInterval = config.pingInterval;
+    retryConnectingDelay = 0; // No reconnect required
+    
+   
     Log->Append("SigmaWsServer: ").Append(name).Internal();
     Log->Append("AuthType:").Append(config.authType).Internal();
     Log->Append("MaxClients:").Append(config.maxClients).Internal();
@@ -24,13 +28,8 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
 
-    if (config.pingInterval > 0)
-    {
-        Log->Append("Start Ping timer").Internal();
-        pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval), pdTRUE, this, pingTask);
-        xTimerStart(pingTimer, 0);
-    }
-
+    setPingTimer(this);
+    
     server = new AsyncWebServer(config.port);
     ws = new AsyncWebSocket(config.rootPath);
     allowableClients.clear();
@@ -82,39 +81,47 @@ void SigmaWsServer::Close()
     Disconnect();
 }
 
-void SigmaWsServer::pingTask(TimerHandle_t xTimer)
+
+void SigmaWsServer::sendPing()
 {
-    SigmaWsServer *server = (SigmaWsServer *)pvTimerGetTimerID(xTimer);
-    server->Log->Append("PingTask").Internal();
-    for (auto it = server->clients.begin(); it != server->clients.end(); it++)
+    Log->Append("PingTask").Internal();
+    std::vector<int32_t> clientsToRemove;
+    clientsToRemove.clear();
+    for (auto it = clients.begin(); it != clients.end(); it++)
     {
-        // server->Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
+        Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
         if (it->second.pingType == NO_PING)
         {
             continue;
         }
-        server->Log->Append("Sending ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Internal();
+        //server->Log->Append("Sending ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Internal();
         //it->second.pingRetryCount--;
         bool res = false;
         if (it->second.pingType == PING_ONLY_TEXT)
         {
-            res = server->sendMessageToClient(it->second, "PING");
+            res = sendMessageToClient(it->second, "PING");
         }
         else if (it->second.pingType == PING_ONLY_BINARY)
         {
-            res = server->sendPingToClient(it->second, "PING");
+            res = sendPingToClient(it->second, "PING");
         }
         if (!res)
         {
-            server->Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
+            Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
         }
         it->second.pingRetryCount--;
-        if (it->second.pingRetryCount <= 0)
+        if (it->second.pingRetryCount < 0)
         {
-            server->Log->Append("Client " + it->second.clientId + " disconnected due to ping timeout").Error();
+            Log->Append("Client " + it->second.clientId + " disconnected due to ping timeout").Error();
             it->second.wsClient->close();
-            server->clients.erase(it->second.clientNumber);
+            clientsToRemove.push_back(it->second.clientNumber);
+            String msg = "PING_TIMEOUT.  Client:" + it->second.clientId + " disconnected.";
+            esp_event_post_to(GetEventLoop(), GetEventBase(), PROTOCOL_PING_TIMEOUT, (void *)(msg.c_str()), msg.length() + 1, portMAX_DELAY);
         }
+    }
+    for (auto it = clientsToRemove.begin(); it != clientsToRemove.end(); it++)  
+    {
+        clients.erase(*it);
     }
 }
 

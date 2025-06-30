@@ -12,6 +12,7 @@ typedef enum
     PROTOCOL_AP_DISCONNECTED,
     PROTOCOL_STA_DISCONNECTED,
     PROTOCOL_ERROR,
+    PROTOCOL_PING_TIMEOUT,
     // PROTOCOL_AUTH_SUCCESS,
     // PROTOCOL_AUTH_FAILED,
     PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE,
@@ -24,6 +25,8 @@ typedef enum
     PROTOCOL_SEND_SIGMA_MESSAGE,
     PROTOCOL_SEND_PING,
     PROTOCOL_SEND_PONG,
+    PROTOCOL_SEND_RECONNECT,
+    PROTOCOL_SEND_CLOSE,
 } EVENT_IDS;
 
 /*
@@ -130,6 +133,8 @@ typedef struct
     bool enabled = true;
     int retryConnectingCount = 3;
     int retryConnectingDelay = 5000; // 5 second
+    int pingInterval = 60000; // 60 seconds
+    int pingRetryCount = 3; // reconnect after 3 pings
 } WSClientConfig;
 
 typedef enum
