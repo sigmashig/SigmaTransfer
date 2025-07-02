@@ -149,6 +149,19 @@ AuthType SigmaConnection::AuthTypeFromString(String typeName)
     return AUTH_TYPE_NONE;
 }
 
+PingType SigmaConnection::PingTypeFromString(String typeName)
+{
+    if (typeName == "PING_ONLY_TEXT")
+    {
+        return PING_ONLY_TEXT;
+    }
+    else if (typeName == "PING_ONLY_BINARY")
+    {
+        return PING_ONLY_BINARY;
+    }
+    return NO_PING;
+}
+
 TopicSubscription *SigmaConnection::GetSubscription(String topic)
 {
     auto it = subscriptions.find(topic);

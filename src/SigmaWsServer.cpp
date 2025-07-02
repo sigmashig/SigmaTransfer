@@ -384,7 +384,7 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             server->clients[data.wsClient->id()].pingRetryCount = server->config.pingRetryCount;
             return;
         }
-        server->Log->Append("Payload: ").Append(payload).Internal();
+        //server->Log->Append("Payload: ").Append(payload).Internal();
 
         if ((!auth->isAuth && server->config.authType == AUTH_TYPE_FIRST_MESSAGE) || server->config.authType == AUTH_TYPE_ALL_MESSAGES)
         {
@@ -417,8 +417,8 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
         if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
         {
             SigmaInternalPkg pkg(payload);
-            server->Log->Append("Sending event to protocol(sigma):").Append(pkg.GetTopic()).Internal();
-            server->Log->Append("PKG:").Append(pkg.GetTopic()).Append("#").Append(pkg.GetPayload()).Append("#").Append(pkg.GetPkgString()).Append("#").Internal();
+            //server->Log->Append("Sending event to protocol(sigma):").Append(pkg.GetTopic()).Internal();
+            //server->Log->Append("PKG:").Append(pkg.GetTopic()).Append("#").Append(pkg.GetPayload()).Append("#").Append(pkg.GetPkgString()).Append("#").Internal();
             esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {
@@ -427,13 +427,13 @@ void SigmaWsServer::handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerD
             auto subscription = server->subscriptions.find(pkg.GetTopic());
             if (subscription != server->subscriptions.end())
             {
-                server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
+                //server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
                 esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), subscription->second.eventId, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             }
         }
         else
         {
-            server->Log->Append("Sending RAW event:").Append(payload).Internal();
+            //server->Log->Append("Sending RAW event:").Append(payload).Internal();
             esp_err_t espErr = esp_event_post_to(server->GetEventLoop(), server->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE, (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
             if (espErr != ESP_OK)
             {

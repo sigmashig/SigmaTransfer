@@ -45,6 +45,7 @@ public:
     static SigmaConnection *Create(String TypeName, SigmaConnectionsConfig config, SigmaLoger *logger = nullptr, uint priority = 5) { return Create(String2Type(TypeName), config, logger, priority); };
     static SigmaConnection *Create(SigmaProtocolType type, SigmaConnectionsConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
     static AuthType AuthTypeFromString(String typeName);
+    static PingType PingTypeFromString(String typeName);
 
 protected:
     esp_event_base_t eventBase = "SigmaConnection";
