@@ -26,6 +26,8 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PING, protocolEventHandler, this);
     esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
     xQueue = xQueueCreate(10, sizeof(httpd_req_t *));
+    requestSemaphore = xSemaphoreCreateBinaryStatic(&requestBuffer);
+    xSemaphoreGive(requestSemaphore);
     xTaskCreate(processData, "ProcessData", 4096, this, 1, NULL);
 
     setPingTimer(this);
@@ -51,9 +53,33 @@ SigmaWsServer::~SigmaWsServer()
 
 esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
 {
-    httpd_req_t *reqCopy = (httpd_req_t *)malloc(sizeof(httpd_req_t));
-    memcpy(reqCopy, req, sizeof(httpd_req_t));
-    xQueueSend(xQueue, reqCopy, portMAX_DELAY);
+    Serial.printf("onWsEvent:method=%d, len=%d\n", req->method, req->content_len);
+    // Serial.printf("onWsEvent:req=%p\n", req);
+    /*
+    while (xSemaphoreTake(requestSemaphore, portMAX_DELAY) != pdPASS) {
+        Serial.printf("onWsEvent:semaphore take failed\n");
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+    */
+    if (xSemaphoreTake(requestSemaphore, portMAX_DELAY) == pdPASS)
+    {
+        Serial.printf("onWsEvent:semaphore taken\n");
+        xQueueSend(xQueue, &req, portMAX_DELAY);
+        if (xSemaphoreTake(requestSemaphore, portMAX_DELAY) == pdPASS)
+        {
+            Serial.printf("onWsEvent:semaphore taken\n");
+            xSemaphoreGive(requestSemaphore);
+            Serial.printf("onWsEvent:semaphore given\n");
+        }
+        else
+        {
+            Serial.printf("onWsEvent:semaphore 2 take failed\n");
+        }
+    }
+    else
+    {
+        Serial.printf("onWsEvent:semaphore take failed\n");
+    }
     return ESP_OK;
 }
 
@@ -122,17 +148,17 @@ void SigmaWsServer::processData(void *arg)
 
     while (true)
     {
-        httpd_req_t *req = NULL;
-        memset(req, 0, sizeof(httpd_req_t));
+        httpd_req_t *req;
         if (xQueueReceive(serv->xQueue, &req, portMAX_DELAY) == pdPASS)
         {
+            Serial.printf("processData:req->method=%d, req->content_len=%d\n", req->method, req->content_len);
+            int32_t socketNumber = httpd_req_to_sockfd(req);
             if (req->method == HTTP_GET)
             {
-                FullAddress fullAddress = serv->getClientFullAddress(req);
                 ClientAuth auth;
 
                 auth.clientId = "";
-                auth.socketNumber = httpd_req_to_sockfd(req);
+                auth.socketNumber = socketNumber;
                 auth.fullAddress = serv->getClientFullAddress(auth.socketNumber);
                 auth.isAuth = false;
                 auth.pingType = PingType::PING_ONLY_BINARY;
@@ -193,14 +219,13 @@ void SigmaWsServer::processData(void *arg)
             else
             {
                 // data package received
-                int32_t socketNumber = httpd_req_to_sockfd(req);
                 if (serv->clients.find(socketNumber) != serv->clients.end())
                 {
                     httpd_ws_frame_t wsPkg;
                     memset(&wsPkg, 0, sizeof(httpd_ws_frame_t));
                     wsPkg.type = HTTPD_WS_TYPE_TEXT;
 
-                    // First receive the packet
+                    // First receive the packet length
                     esp_err_t ret = httpd_ws_recv_frame(req, &wsPkg, 0);
                     if (ret != ESP_OK)
                     {
@@ -254,7 +279,7 @@ void SigmaWsServer::processData(void *arg)
                         else if (wsPkg.type == HTTPD_WS_TYPE_PING)
                         {
                             serv->Log->Printf("Ping package received from client %s\n", serv->clients[socketNumber].clientId.c_str()).Internal();
-                            serv->sendPongToClient(req, wsPkg.payload, wsPkg.len);
+                            serv->sendPongToClient(serv->clients[socketNumber], String((char *)wsPkg.payload, wsPkg.len));
                         }
                         else if (wsPkg.type == HTTPD_WS_TYPE_PONG)
                         {
@@ -268,7 +293,7 @@ void SigmaWsServer::processData(void *arg)
                         }
                         else
                         {
-                            serv->Log->Printf("Unknown package type\n").Error();
+                            serv->Log->Printf("Unknown package type:%d\n", wsPkg.type).Error();
                         }
                     }
                 }
@@ -278,28 +303,17 @@ void SigmaWsServer::processData(void *arg)
                     serv->removeClient(socketNumber);
                 }
             }
-            free(req);
+            // free(req);
+            Serial.printf("processData:semaphore giving\n");
+            xSemaphoreGive(requestSemaphore);
         }
     }
 }
 
-void SigmaWsServer::sendPongToClient(httpd_req_t *req, uint8_t *payload, size_t len)
-{
-    if (req != NULL)
-    {
-        httpd_ws_frame_t pong_frame = {
-            .final = 1,
-            .fragmented = 0,
-            .type = HTTPD_WS_TYPE_PONG,
-            .payload = payload,
-            .len = len};
-        httpd_ws_send_frame(req, &pong_frame);
-    }
-}
 void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t socketNumber, httpd_req_t *req)
 {
-    // TODO: processing of text package
     String payloadStr = String((char *)payload, len);
+    Log->Printf("handleTextPackage:payloadStr=%s\n", payloadStr.c_str()).Internal();
     if (clients.find(socketNumber) == clients.end())
     {
         Log->Printf("Client %d not found\n", socketNumber).Error();
@@ -307,6 +321,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
     }
     else if (clients[socketNumber].isAuth || config.authType == AUTH_TYPE_NONE)
     { // client is authenticated or auth type is none
+        Log->Append("Client is authenticated or none auth type").Internal();
         if (config.authType == AUTH_TYPE_ALL_MESSAGES)
         {
             String payload = payloadStr;
@@ -326,14 +341,17 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
             uPayload.toUpperCase();
             if (uPayload.startsWith("PING"))
             {
-                sendPongToClient(req, payload + strlen("PING"), len - strlen("PING"));
+                Log->Printf("PING command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
+                sendPongToClient(clients[socketNumber], String((char *)payload + strlen("PING"), len - strlen("PING")));
             }
             else if (uPayload.startsWith("PONG"))
             {
+                Log->Printf("PONG command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
                 // TODO: processing of pong package
             }
             else if (uPayload.startsWith("CLOSE"))
             {
+                Log->Printf("CLOSE command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
                 removeClient(socketNumber);
             }
             else
@@ -381,10 +399,11 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
     }
 }
 
-bool SigmaWsServer::clientAuthRequest(httpd_req_t *req, String request, ClientAuth *auth, String &payload)
+bool SigmaWsServer::clientAuthRequest(httpd_req_t *req, String &request, ClientAuth *auth, String &payload)
 {
+    Log->Append("clientAuthRequest:request=").Append(request).Internal();
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload);
+    DeserializationError error = deserializeJson(doc, request);
     if (error)
     {
         Log->Append("Failed to deserialize JSON: ").Append(error.c_str()).Error();
@@ -441,7 +460,7 @@ void SigmaWsServer::Connect()
             .is_websocket = true};
         httpd_register_uri_handler(server, &ws_uri);
 
-        Log->Append("WebSocket server started on ws://").Append(WiFi.localIP()).Append(config.rootPath).Internal();
+        Log->Append("WebSocket server started on ws://").Append(WiFi.localIP().toString()).Append(config.rootPath).Append(":").Append(config.port).Internal();
         setReady(true);
         SendMessage("CONNECTED", PROTOCOL_CONNECTED);
     }
@@ -498,13 +517,14 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 
 void SigmaWsServer::sendPing()
 {
+    return;
     Log->Append("PingTask").Internal();
     std::vector<int32_t> clientsToRemove;
     clientsToRemove.clear();
     for (auto it = clients.begin(); it != clients.end(); it++)
     {
         Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
-        bool res = sendPingToClient(&it->second, "PING");
+        bool res = sendPingToClient(it->second, "PING");
         if (!res)
         {
             Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
@@ -525,37 +545,72 @@ void SigmaWsServer::sendPing()
     }
 }
 
-bool SigmaWsServer::sendPingToClient(ClientAuth *auth, String payload)
+bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload)
 {
     bool res = false;
-    if (auth->pingType == NO_PING)
+    if (auth.pingType == NO_PING)
     {
         res = true;
     }
-    if (auth->pingType == PING_ONLY_TEXT)
+    if (auth.pingType == PING_ONLY_TEXT)
     {
         sendMessageToClient(auth, "PING");
         res = true;
     }
-    else if (auth->pingType == PING_ONLY_BINARY)
+    else if (auth.pingType == PING_ONLY_BINARY)
+    {
+        res = sendPingToClient(auth.socketNumber, "PING");
+    }
+    if (!res)
+    {
+        Log->Append("Failed to send ping to client:").Append(auth.clientId).Append("#").Append(auth.pingRetryCount).Error();
+    }
+    auth.pingRetryCount--;
+    if (auth.pingRetryCount < 0)
+    {
+        Log->Append("Client " + auth.clientId + " disconnected due to ping timeout").Error();
+        removeClient(auth.socketNumber);
+        SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+    }
+    return res;
+}
+
+bool SigmaWsServer::sendPongToClient(ClientAuth &auth, String payload)
+{
+    bool res = false;
+    if (auth.pingType == NO_PING)
+    {
+        res = true;
+    }
+    if (auth.pingType == PING_ONLY_TEXT)
+    {
+        sendMessageToClient(auth, "PONG");
+        res = true;
+    }
+    else if (auth.pingType == PING_ONLY_BINARY)
     {
         res = sendPingToClient(auth, "PING");
     }
     if (!res)
     {
-        Log->Append("Failed to send ping to client:").Append(auth->clientId).Append("#").Append(auth->pingRetryCount).Error();
+        Log->Append("Failed to send ping to client:").Append(auth.clientId).Append("#").Append(auth.pingRetryCount).Error();
     }
-    auth->pingRetryCount--;
-    if (auth->pingRetryCount < 0)
+    auth.pingRetryCount--;
+    if (auth.pingRetryCount < 0)
     {
-        Log->Append("Client " + auth->clientId + " disconnected due to ping timeout").Error();
-        removeClient(auth->socketNumber);
-        SendMessage("PING_TIMEOUT.  Client:" + auth->clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+        Log->Append("Client " + auth.clientId + " disconnected due to ping timeout").Error();
+        removeClient(auth.socketNumber);
+        SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
     }
     return res;
 }
 
-void SigmaWsServer::sendMessageToClient(ClientAuth *auth, String message)
+bool SigmaWsServer::sendMessageToClient(ClientAuth &auth, String message)
+{
+    return sendMessageToClient(auth.socketNumber, message);
+}
+
+bool SigmaWsServer::sendMessageToClient(int32_t socketNumber, String message)
 {
     httpd_ws_frame_t text_frame = {
         .final = 1,
@@ -563,7 +618,29 @@ void SigmaWsServer::sendMessageToClient(ClientAuth *auth, String message)
         .type = HTTPD_WS_TYPE_TEXT,
         .payload = (uint8_t *)message.c_str(),
         .len = message.length()};
-    httpd_ws_send_frame_async(server, auth->socketNumber, &text_frame);
+    return (ESP_OK == httpd_ws_send_frame_async(server, socketNumber, &text_frame));
+}
+
+bool SigmaWsServer::sendPongToClient(int32_t socketNumber, String message)
+{
+    httpd_ws_frame_t text_frame = {
+        .final = 1,
+        .fragmented = 0,
+        .type = HTTPD_WS_TYPE_PONG,
+        .payload = (uint8_t *)message.c_str(),
+        .len = message.length()};
+    return (ESP_OK == httpd_ws_send_frame_async(server, socketNumber, &text_frame));
+}
+
+bool SigmaWsServer::sendPingToClient(int32_t socketNumber, String message)
+{
+    httpd_ws_frame_t text_frame = {
+        .final = 1,
+        .fragmented = 0,
+        .type = HTTPD_WS_TYPE_PING,
+        .payload = (uint8_t *)message.c_str(),
+        .len = message.length()};
+    return (ESP_OK == httpd_ws_send_frame_async(server, socketNumber, &text_frame));
 }
 
 void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -599,13 +676,12 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
         if (pkg.IsBinary())
         {
             Serial.printf("sendMessageToClient: binary\n");
-            //Serial.println(pkg.GetPkgString().c_str());
-            //res = ws->sendMessageToClient(pkg.GetClientId(), pkg.GetBinaryPayload(), pkg.GetBinaryPayloadLength());
+            // Serial.println(pkg.GetPkgString().c_str());
+            // res = ws->sendMessageToClient(pkg.GetClientId(), pkg.GetBinaryPayload(), pkg.GetBinaryPayloadLength());
         }
         else
         {
-            ws->sendMessageToClient(auth, pkg.GetPkgString());
-            res = true;
+            res = ws->sendMessageToClient(*auth, pkg.GetPkgString());
         }
         if (!res)
         {
@@ -615,11 +691,11 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
     else if (event_id == PROTOCOL_SEND_PING)
     {
         // Nothing to do here
-        //ws->sendPingToClient(auth, pkg.GetPayload());
+        // ws->sendPingToClient(auth, pkg.GetPayload());
     }
     else if (event_id == PROTOCOL_SEND_PONG)
     {
         // Nothing to do here
-        //ws->sendPongToClient(auth, pkg.GetPayload());
+        // ws->sendPongToClient(auth, pkg.GetPayload());
     }
 }

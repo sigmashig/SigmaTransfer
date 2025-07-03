@@ -1,1 +1,1 @@
-C:\winapps\bin\xtensa-esp32-elf-addr2line.exe  -pfiaC -e .\.pio\build\Sigma\firmware.elf 0x4015ee54:0x3ffbd660 0x400d771a:0x3ffbd680 0x400d30e9:0x3ffbd6f0 0x4008f3c7:0x3ffbd710
+C:\winapps\bin\xtensa-esp32-elf-addr2line.exe  -pfiaC -e .\.pio\build\Sigma\firmware.elf 0x400836fd:0x3ffb57d0 0x4008c039:0x3ffb57f0 0x40091a41:0x3ffb5810 0x4008caee:0x3ffb5940 0x400d9056:0x3ffb5980
