@@ -8,31 +8,26 @@
 #include <map>
 #include <esp_event.h>
 #include "SigmaConnection.h"
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
 #include "SigmaTransferDefs.h"
-#include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
+#include <esp_http_server.h>
 
-typedef struct
+typedef struct FullAddress
 {
-    String clientId; // the string ID as provided by client
-    int32_t clientNumber;
+    IPAddress ip;
+    uint port;
+} FullAddress;
+
+typedef struct ClientAuth
+{
+    String clientId = ""; // the string ID as provided by client
+    FullAddress fullAddress = {IPAddress(0, 0, 0, 0), 0};
+    int32_t socketNumber = 0;
     bool isAuth = false;
     PingType pingType = NO_PING;
-    AsyncWebSocketClient *wsClient;
     int pingRetryCount = 3;
+    // ClientAuth() : clientId(""), fullAddress{IPAddress(0, 0, 0, 0), 0}, isAuth(false), pingType(NO_PING), pingRetryCount(3) {}
 } ClientAuth;
-
-typedef struct
-{
-    AsyncWebSocket *wsServer;
-    AsyncWebSocketClient *wsClient;
-    AwsFrameInfo *frameInfo;
-    uint8_t *data;
-    AwsEventType type;
-    size_t len;
-} SigmaWsServerData;
 
 class SigmaWsServer : public SigmaConnection
 {
@@ -81,45 +76,68 @@ public:
         }
         return nullptr;
     }
-    bool sendMessageToClient(String clientId, String message);
-    bool sendMessageToClient(ClientAuth auth, String message);
-    bool sendMessageToClient(String clientId, byte *data, size_t size);
-    bool sendPingToClient(String clientId, String payload);
-    bool sendPingToClient(ClientAuth auth, String payload);
-    bool sendPongToClient(String clientId, String payload);
-    bool sendPongToClient(ClientAuth auth, String payload);
-    void setReady(bool ready) { isReady = ready; };
 
 private:
+    httpd_handle_t server;
     WSServerConfig config;
-
-    AsyncWebServer *server;
-    AsyncWebSocket *ws;
     std::map<String, AllowableClient> allowableClients; // clientId -> AllowableClients
-
-    void clearReconnect(){/*nothing todo */};
-
-    static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
-    static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
-    static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    inline static std::map<int32_t, ClientAuth> clients; // clientNumber -> ClientAuth
-    bool clientAuthRequest(String payload, String &clientId);
-    bool isClientAvailable(String clientId, String authKey);
-
-    bool isClientLimitReached(SigmaWsServer *server, AsyncWebSocketClient *client);
-
-    bool isConnectionLimitReached(String clientId, SigmaWsServer *server, AsyncWebSocketClient *client);
-
-    static void processData(void *arg);
+    std::map<int32_t, ClientAuth> clients;              // socketNumber -> ClientAuth
     inline static QueueHandle_t xQueue;
-    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-
-    bool sendMessageToClient(int32_t clientNumber, String message);
     bool shouldConnect = true;
+    httpd_config_t serverConfig = HTTPD_DEFAULT_CONFIG();
+
     void Connect();
     void Disconnect();
     void Close();
     void sendPing();
+
+    static esp_err_t onWsEvent(httpd_req_t *req);
+    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    bool isClientAvailable(String clientId, String authKey);
+    static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static void processData(void *arg);
+    void sendPongToClient(httpd_req_t *req, uint8_t *payload, size_t len);
+    bool sendPingToClient(ClientAuth *auth, String payload);
+    void sendMessageToClient(ClientAuth *auth, String message);
+    void handleTextPackage(uint8_t *payload, size_t len, int32_t socketNumber, httpd_req_t *req);
+    bool clientAuthRequest(httpd_req_t *req, String request, ClientAuth *auth, String &payload);
+    static FullAddress getClientFullAddress(int32_t socketNumber);
+    static FullAddress getClientFullAddress(httpd_req_t *req);
+
+    // uint64_t getClientNumber(FullAddress fullAddress);
+
+    bool removeClient(int32_t socketNumber);
+
+    int32_t isClientConnected(String clientId);
+
+    // AsyncWebServer *server;
+    // AsyncWebSocket *ws;
+
+    // void clearReconnect(){/*nothing todo */};
+    // bool sendMessageToClient(String clientId, String message);
+    // bool sendMessageToClient(ClientAuth auth, String message);
+    // bool sendMessageToClient(String clientId, byte *data, size_t size);
+    // bool sendPingToClient(String clientId, String payload);
+    // bool sendPingToClient(ClientAuth auth, String payload);
+    // bool sendPongToClient(String clientId, String payload);
+    // bool sendPongToClient(ClientAuth auth, String payload);
+    // void setReady(bool ready) { isReady = ready; };
+
+    // static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+    // static void handleWebSocketMessage(SigmaWsServer *server, SigmaWsServerData data);
+    // bool clientAuthRequest(String payload, String &clientId);
+    // bool isClientAvailable(String clientId, String authKey);
+
+    // bool isClientLimitReached(SigmaWsServer *server, AsyncWebSocketClient *client);
+
+    // bool isConnectionLimitReached(String clientId, SigmaWsServer *server, AsyncWebSocketClient *client);
+
+    // bool sendMessageToClient(int32_t clientNumber, String message);
+    // bool shouldConnect = true;
+    // void Connect();
+    // void Disconnect();
+    // void Close();
+    // void sendPing();
 };
 
 #endif

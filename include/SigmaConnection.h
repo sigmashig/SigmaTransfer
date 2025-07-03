@@ -20,6 +20,7 @@ class SigmaConnection
 {
 public:
     SigmaConnection(String name, SigmaLoger *logger = nullptr, uint priority = 5, uint queueSize = 100, uint stackSize = 4096, uint coreId = 1);
+    virtual void SendMessage(String message, int eventId);
     ~SigmaConnection();
     virtual void Subscribe(TopicSubscription subscriptionTopic)
     {
@@ -60,7 +61,7 @@ protected:
     TimerHandle_t reconnectTimer = nullptr;
     TimerHandle_t pingTimer = nullptr;
     int pingInterval = 60000; // 60 seconds
-    //int pingRetryCount = 3;   // disconnect after 3 pings when applicable
+    // int pingRetryCount = 3;   // disconnect after 3 pings when applicable
     int retryConnectingCount = 3;
     uint retryConnectingDelay = 1000;
 
@@ -69,7 +70,7 @@ protected:
     virtual void Connect() = 0;
     virtual void setReady(bool ready) { isReady = ready; };
     virtual void sendPing() = 0;
-    //virtual void clearReconnect() = 0;
+    // virtual void clearReconnect() = 0;
     void setRootTopic(String rootTopic) { this->rootTopic = rootTopic; };
     TopicSubscription *GetSubscription(String topic);
     void addSubscription(TopicSubscription subscription);

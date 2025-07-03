@@ -25,6 +25,10 @@ SigmaConnection::SigmaConnection(String name, SigmaLoger *logger, uint priority,
         exit(1);
     }
 }
+void SigmaConnection::SendMessage(String message, int eventId)
+{
+    esp_event_post_to(GetEventLoop(), GetEventBase(), eventId, (void *)(message.c_str()), message.length() + 1, portMAX_DELAY);
+}
 
 SigmaConnection::~SigmaConnection()
 {
@@ -80,7 +84,7 @@ void SigmaConnection::clearReconnectTimer(SigmaConnection *conn)
     if (conn->reconnectTimer != nullptr)
     {
         xTimerStop(conn->reconnectTimer, 0);
- //       conn->reconnectTimer = nullptr;
+        //       conn->reconnectTimer = nullptr;
     }
 }
 
