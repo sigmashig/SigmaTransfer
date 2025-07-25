@@ -8,11 +8,16 @@
 #include <map>
 #include <esp_event.h>
 #include "SigmaConnection.h"
-//#include <AsyncTCP.h>
 #include "SigmaTransferDefs.h"
-//#include <AsyncWebSocket.h>
-
-
+#include <esp_websocket_client.h>
+typedef enum
+{
+    WS_TEXT = 0x1,
+    WS_BINARY = 0x2,
+    WS_DISCONNECT = 0x8,
+    WS_PING = 0x9,
+    WS_PONG = 0xA
+} WebSocketOpcode;
 
 class SigmaWsClient : public SigmaConnection
 {
@@ -30,11 +35,16 @@ public:
 
 private:
     WSClientConfig config;
-    //inline static AsyncClient wsClient;
+    bool isReady = false;
+    // inline static AsyncClient wsClient;
     bool shouldConnect = true;
     int pingRetryCount = 0;
 
-    void Connect();
+    esp_websocket_client_handle_t wsClient = NULL;
+    esp_websocket_client_config_t wsClientConfig;
+
+    void
+        Connect();
     void Disconnect();
     void sendPing();
     void Close()
@@ -43,16 +53,19 @@ private:
         Disconnect();
     };
 
-    //static void onConnect(void *arg, AsyncClient *c);
+    static void onConnect(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
     void sendAuthMessage();
-    //static void onDisconnect(void *arg, AsyncClient *c);
-    //static void onData(void *arg, AsyncClient *c, void *data, size_t len);
-    //static void onError(void *arg, AsyncClient *c, int8_t error);
-    //static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
+    static void onDisconnect(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
+    void onDataText(String &payload, SigmaWsClient *ws);
+    void onDataBinary(byte *payload, size_t payloadLen, SigmaWsClient *ws);
+    void onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
+    void onError(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
+    // static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
     bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
     void setReady(bool ready);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static void wsEventHandler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
     bool sendWebSocketTextFrame(const String &payload, bool isAuth = false);
     bool sendWebSocketBinaryFrame(const byte *data, size_t size);
     bool sendWebSocketPingFrame(const String &payload);

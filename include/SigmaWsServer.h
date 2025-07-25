@@ -102,7 +102,7 @@ private:
     bool sendPingToClient(int32_t socketNumber, String message);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void processData(void *arg);
-    bool sendPingToClient(ClientAuth &auth, String payload);
+    bool sendPingToClient(ClientAuth &auth, String payload, bool isRemoveClient = true);
     bool sendPongToClient(ClientAuth &auth, String payload);
     bool sendMessageToClient(ClientAuth &auth, String message);
     void handleTextPackage(uint8_t *payload, size_t len, int32_t socketNumber, httpd_req_t *req);

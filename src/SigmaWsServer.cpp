@@ -36,6 +36,7 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     serverConfig.max_open_sockets = config.maxClients;
 
     httpd_handle_t server = NULL;
+
     allowableClients.clear();
     for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
     {
@@ -63,13 +64,10 @@ esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
     */
     if (xSemaphoreTake(requestSemaphore, portMAX_DELAY) == pdPASS)
     {
-        Serial.printf("onWsEvent:semaphore taken\n");
         xQueueSend(xQueue, &req, portMAX_DELAY);
         if (xSemaphoreTake(requestSemaphore, portMAX_DELAY) == pdPASS)
         {
-            Serial.printf("onWsEvent:semaphore taken\n");
             xSemaphoreGive(requestSemaphore);
-            Serial.printf("onWsEvent:semaphore given\n");
         }
         else
         {
@@ -120,12 +118,9 @@ bool SigmaWsServer::removeClient(int32_t socketNumber)
         if (ret != ESP_OK)
         {
             Log->Printf("Failed to send disconnect to sockfd %d: %d\n", socketNumber, ret).Error();
-            return false;
+            // return false;
         }
-        else
-        {
-            clients.erase(socketNumber);
-        }
+        clients.erase(socketNumber);
     }
     return true;
 }
@@ -229,10 +224,16 @@ void SigmaWsServer::processData(void *arg)
                     esp_err_t ret = httpd_ws_recv_frame(req, &wsPkg, 0);
                     if (ret != ESP_OK)
                     {
-                        serv->Log->Printf("httpd_ws_recv_frame failed with %d", ret).Error();
+                        serv->Log->Printf("P1. httpd_ws_recv_frame failed with %d", ret).Error();
                     }
                     else
                     {
+                        Serial.printf("wsPkg.type: %d\n", wsPkg.type);
+                        Serial.printf("wsPkg.len: %d\n", wsPkg.len);
+                        // Serial.printf("wsPkg.payload: %s\n", (char *)wsPkg.payload);
+                        Serial.printf("wsPkg.final: %d\n", wsPkg.final);
+                        Serial.printf("wsPkg.fragmented: %d\n", wsPkg.fragmented);
+
                         if (wsPkg.type == HTTPD_WS_TYPE_TEXT)
                         {
                             if (wsPkg.len)
@@ -251,7 +252,7 @@ void SigmaWsServer::processData(void *arg)
                                     Serial.printf("ws_pkt.payload: %s\n", (char *)wsPkg.payload);
                                     if (ret != ESP_OK)
                                     {
-                                        serv->Log->Printf("httpd_ws_recv_frame failed with %d", ret).Error();
+                                        serv->Log->Printf("P2.httpd_ws_recv_frame failed with %d", ret).Error();
                                     }
                                     else
                                     { // data package received
@@ -304,7 +305,6 @@ void SigmaWsServer::processData(void *arg)
                 }
             }
             // free(req);
-            Serial.printf("processData:semaphore giving\n");
             xSemaphoreGive(requestSemaphore);
         }
     }
@@ -517,14 +517,13 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 
 void SigmaWsServer::sendPing()
 {
-    return;
     Log->Append("PingTask").Internal();
     std::vector<int32_t> clientsToRemove;
     clientsToRemove.clear();
     for (auto it = clients.begin(); it != clients.end(); it++)
     {
         Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
-        bool res = sendPingToClient(it->second, "PING");
+        bool res = sendPingToClient(it->second, "PING", false);
         if (!res)
         {
             Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
@@ -545,7 +544,7 @@ void SigmaWsServer::sendPing()
     }
 }
 
-bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload)
+bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRemoveClient)
 {
     bool res = false;
     if (auth.pingType == NO_PING)
@@ -565,12 +564,15 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload)
     {
         Log->Append("Failed to send ping to client:").Append(auth.clientId).Append("#").Append(auth.pingRetryCount).Error();
     }
-    auth.pingRetryCount--;
-    if (auth.pingRetryCount < 0)
+    if (isRemoveClient)
     {
-        Log->Append("Client " + auth.clientId + " disconnected due to ping timeout").Error();
-        removeClient(auth.socketNumber);
-        SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+        auth.pingRetryCount--;
+        if (auth.pingRetryCount < 0)
+        {
+            Log->Append("Client " + auth.clientId + " disconnected due to ping timeout").Error();
+            removeClient(auth.socketNumber);
+            SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+        }
     }
     return res;
 }

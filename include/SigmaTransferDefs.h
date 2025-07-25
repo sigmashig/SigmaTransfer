@@ -133,8 +133,8 @@ typedef struct
     bool enabled = true;
     int retryConnectingCount = 3;
     int retryConnectingDelay = 5000; // 5 second
-    int pingInterval = 60000; // 60 seconds
-    int pingRetryCount = 3; // reconnect after 3 pings
+    int pingInterval = 60000;        // 60 seconds
+    int pingRetryCount = 3;          // reconnect after 3 pings
 } WSClientConfig;
 
 typedef enum
@@ -182,4 +182,3 @@ typedef struct
     WSClientConfig wsClientConfig;
     WSServerConfig wsServerConfig;
 } SigmaConnectionsConfig;
-
