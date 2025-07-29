@@ -62,7 +62,10 @@ void SigmaConnection::reconnectTask(TimerHandle_t xTimer)
 void SigmaConnection::pingTask(TimerHandle_t xTimer)
 {
     SigmaConnection *conn = (SigmaConnection *)pvTimerGetTimerID(xTimer);
-    conn->sendPing();
+    if (conn->IsReady())
+    {
+        conn->sendPing();
+    }
 }
 
 void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
@@ -73,7 +76,7 @@ void SigmaConnection::setReconnectTimer(SigmaConnection *conn)
         clearReconnectTimer(conn);
         if (conn->reconnectTimer == nullptr)
         {
-            conn->reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay), pdFALSE, conn, reconnectTask);
+            conn->reconnectTimer = xTimerCreate("reconnectTimer", pdMS_TO_TICKS(conn->retryConnectingDelay * 1000), pdFALSE, conn, reconnectTask);
         }
         xTimerReset(conn->reconnectTimer, 0);
     }
@@ -95,7 +98,7 @@ void SigmaConnection::setPingTimer(SigmaConnection *conn)
     {
         if (conn->pingTimer == nullptr)
         {
-            conn->pingTimer = xTimerCreate("pingTimer", pdMS_TO_TICKS(conn->pingInterval), pdTRUE, conn, pingTask);
+            conn->pingTimer = xTimerCreate("pingTimer", pdMS_TO_TICKS(conn->pingInterval * 1000), pdTRUE, conn, pingTask);
         }
         xTimerReset(conn->pingTimer, 0);
     }

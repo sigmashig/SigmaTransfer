@@ -22,7 +22,7 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     wsClientConfig.task_prio = 1;
     wsClientConfig.task_stack = 4096;
     wsClientConfig.buffer_size = 1024;
-    wsClientConfig.ping_interval_sec = 15;
+    wsClientConfig.ping_interval_sec = config.pingInterval;
     wsClientConfig.pingpong_timeout_sec = 20;
     wsClientConfig.disable_pingpong_discon = true;
     wsClientConfig.keep_alive_enable = true;
@@ -31,7 +31,7 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     {
         Log->Append("Using Basic Authentication").Internal();
         String authRec = "Authorization: Basic \r\n";
-        authRec+="Bearer="+config.apiKey+"\r\n";
+        authRec+="Bearer:"+config.apiKey+"\r\n";
         /*
         char *buffer;
         int bufferLen = base64_encode_expected_len(config.apiKey.length());
@@ -247,6 +247,7 @@ void SigmaWsClient::sendPing()
     }
     else
     {
+        Log->Append("[sendPing]Sending PING frame").Internal();
         pingRetryCount--;
         sendWebSocketPingFrame("PING");
     }
@@ -264,6 +265,7 @@ void SigmaWsClient::onConnect(esp_websocket_event_data_t &arg, SigmaWsClient *ws
     ws->clearReconnectTimer(ws);
     ws->retryConnectingCount = ws->config.retryConnectingCount;
     ws->pingRetryCount = ws->config.pingRetryCount;
+    ws->setReady(true);
     if (ws->config.authType & AUTH_TYPE_FIRST_MESSAGE)
     {
         ws->sendAuthMessage();
@@ -373,12 +375,13 @@ void SigmaWsClient::onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws)
     case WS_DISCONNECT:
     {
         ws->Log->Append("Received CLOSE frame").Internal();
-        ws->setReady(false);
+        //ws->setReady(false);
+        ws->Disconnect();
         break;
     }
     case WS_PING:
     {
-        ws->Log->Append("Received PING frame").Internal();
+        ws->Log->Append("Received PING(binary) frame").Internal();
         break;
     }
     case WS_PONG:

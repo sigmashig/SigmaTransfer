@@ -6,12 +6,8 @@ SigmaLoger *Log;
 
 SigmaConnection *protocol = NULL;
 
-void TestSuite1()
+void TestPingPong()
 {
-  String payload = "Please, respond {'topic':'topic1','payload':'OK'}";
-  SigmaInternalPkg pkg("topic1", payload.c_str());
-  Log->Append("Sending message:").Append(pkg.GetPkgString()).Internal();
-  esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length() + 1, portMAX_DELAY);
 }
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -127,10 +123,6 @@ void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
   {
     Log->Append("PROTOCOL_RECEIVED_PONG").Internal();
   }
-  else if (event_id = PROTOCOL_PING_TIMEOUT)
-  {
-    Log->Append("PROTOCOL_PING_TIMEOUT").Internal();
-  }
   else
   {
     Log->Internal("Unknown event");
@@ -165,21 +157,21 @@ void setup()
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
     exit(1);
   }
-  Log->Append("Creating WS Client").Internal();
+  Log->Append("Creating WS Server").Internal();
 
-  WSClientConfig wsConfig;
-  wsConfig.host = "192.168.0.47";
-  wsConfig.port = 8080;
-  wsConfig.rootPath = "/";
-  wsConfig.enabled = true;
-  wsConfig.apiKey = "secret-api-key-12345";
-  wsConfig.pingInterval = 10000;
-  wsConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  WSClientConfig wsClientConfig;
 
-  SigmaWsClient *wsClient = new SigmaWsClient(wsConfig, Log);
+  wsClientConfig.host = "ws://192.168.0.47";
+  wsClientConfig.port = 8080;
+  wsClientConfig.enabled = true;
+  wsClientConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  wsClientConfig.apiKey = "secret-api-key-12345";
+  wsClientConfig.pingInterval = 10;
+  wsClientConfig.pingRetryCount = 3;
+  SigmaWsClient *wsClient = new SigmaWsClient(wsClientConfig, Log);
 
   protocol = wsClient;
-  Log->Append("WS Client created").Internal();
+  Log->Append("WS Server created").Internal();
   espErr = esp_event_handler_instance_register_with(
       wsClient->GetEventLoop(),
       wsClient->GetEventBase(), // ESP_EVENT_ANY_BASE,
@@ -202,7 +194,7 @@ void setup()
     delay(100);
   }
   Log->Append("Protocol is ready").Internal();
-  TestSuite1();
+  TestPingPong();
   Log->Append("Setup end").Internal();
 }
 

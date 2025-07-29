@@ -35,7 +35,7 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     serverConfig.server_port = config.port;
     serverConfig.max_open_sockets = config.maxClients;
 
-    httpd_handle_t server = NULL;
+    // httpd_handle_t server = NULL;
 
     allowableClients.clear();
     for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
@@ -79,6 +79,42 @@ esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
         Serial.printf("onWsEvent:semaphore take failed\n");
     }
     return ESP_OK;
+}
+
+void send_ws_message(void *arg)
+{
+    TransferPkg *pkg = (TransferPkg *)arg;
+
+    httpd_ws_frame_t wsFrame = {
+        .final = true,
+        .fragmented = false};
+
+    switch (pkg->type)
+    {
+    case HTTPD_WS_TYPE_TEXT:
+        wsFrame.type = HTTPD_WS_TYPE_TEXT;
+        wsFrame.payload = (uint8_t *)pkg->message.c_str();
+        wsFrame.len = pkg->message.length();
+        break;
+    case HTTPD_WS_TYPE_BINARY:
+        wsFrame.type = HTTPD_WS_TYPE_BINARY;
+        wsFrame.payload = (uint8_t *)pkg->buffer;
+        wsFrame.len = pkg->len;
+        break;
+    case HTTPD_WS_TYPE_PING:
+        wsFrame.type = HTTPD_WS_TYPE_PING;
+        wsFrame.payload = (uint8_t *)pkg->message.c_str();
+        wsFrame.len = pkg->message.length();
+        break;
+    case HTTPD_WS_TYPE_PONG:
+        wsFrame.type = HTTPD_WS_TYPE_PONG;
+        wsFrame.payload = (uint8_t *)pkg->message.c_str();
+        wsFrame.len = pkg->message.length();
+        break;
+    }
+
+    httpd_ws_send_frame_async(pkg->server, pkg->socketNumber, &wsFrame);
+    return;
 }
 
 FullAddress SigmaWsServer::getClientFullAddress(int32_t socketNumber)
@@ -144,9 +180,20 @@ void SigmaWsServer::processData(void *arg)
     while (true)
     {
         httpd_req_t *req;
+
         if (xQueueReceive(serv->xQueue, &req, portMAX_DELAY) == pdPASS)
         {
             Serial.printf("processData:req->method=%d, req->content_len=%d\n", req->method, req->content_len);
+            /*
+            Serial.println("Request");
+            Serial.printf("req->handle: %p\n", req->handle);
+            Serial.printf("req->uri: %s\n", req->uri);
+            Serial.printf("req->method: %d\n", req->method);
+            Serial.printf("req->content_len: %d\n", req->content_len);
+            Serial.printf("req->aux: %p\n", req->aux);
+            Serial.printf("req->sess_ctx: %p\n", req->sess_ctx);
+            Serial.printf("req->free_ctx: %p\n", req->free_ctx);
+            */
             int32_t socketNumber = httpd_req_to_sockfd(req);
             if (req->method == HTTP_GET)
             {
@@ -156,7 +203,7 @@ void SigmaWsServer::processData(void *arg)
                 auth.socketNumber = socketNumber;
                 auth.fullAddress = serv->getClientFullAddress(auth.socketNumber);
                 auth.isAuth = false;
-                auth.pingType = PingType::PING_ONLY_BINARY;
+                // auth.pingType = PingType::PING_ONLY_BINARY;
                 auth.pingRetryCount = serv->config.pingRetryCount;
                 serv->clients[auth.socketNumber] = auth;
 
@@ -218,21 +265,21 @@ void SigmaWsServer::processData(void *arg)
                 {
                     httpd_ws_frame_t wsPkg;
                     memset(&wsPkg, 0, sizeof(httpd_ws_frame_t));
-                    wsPkg.type = HTTPD_WS_TYPE_TEXT;
+                    // wsPkg.type = HTTPD_WS_TYPE_TEXT;
 
                     // First receive the packet length
                     esp_err_t ret = httpd_ws_recv_frame(req, &wsPkg, 0);
+                    Serial.printf("wsPkg.type: %d\n", wsPkg.type);
+                    Serial.printf("wsPkg.len: %d\n", wsPkg.len);
+                    // Serial.printf("wsPkg.payload: %s\n", (char *)wsPkg.payload);
+                    Serial.printf("wsPkg.final: %d\n", wsPkg.final);
+                    Serial.printf("wsPkg.fragmented: %d\n", wsPkg.fragmented);
                     if (ret != ESP_OK)
                     {
                         serv->Log->Printf("P1. httpd_ws_recv_frame failed with %d", ret).Error();
                     }
                     else
                     {
-                        Serial.printf("wsPkg.type: %d\n", wsPkg.type);
-                        Serial.printf("wsPkg.len: %d\n", wsPkg.len);
-                        // Serial.printf("wsPkg.payload: %s\n", (char *)wsPkg.payload);
-                        Serial.printf("wsPkg.final: %d\n", wsPkg.final);
-                        Serial.printf("wsPkg.fragmented: %d\n", wsPkg.fragmented);
 
                         if (wsPkg.type == HTTPD_WS_TYPE_TEXT)
                         {
@@ -422,6 +469,7 @@ bool SigmaWsServer::clientAuthRequest(httpd_req_t *req, String &request, ClientA
             {
                 if (it->second.clientId == cId && it->first != auth->socketNumber)
                 { // duplicated clientId
+                    Serial.printf("clientAuthRequest: duplicated clientId: %s:%d\n", cId.c_str(), it->first);
                     toRemove.push_back(it->first);
                 }
             }
@@ -448,7 +496,27 @@ void SigmaWsServer::Connect()
         return;
     }
 
+    Serial.println("List of allowable clients:");
+    for (auto it = allowableClients.begin(); it != allowableClients.end(); it++)
+    {
+        Serial.printf("clientId: %s, authKey: %s, pingType: %d\n", it->second.clientId.c_str(), it->second.authKey.c_str(), it->second.pingType);
+    }
     // Start server
+    Log->Append("Connecting to WebSocket server:").Internal();
+    /*
+    Log->Append("serverConfig.server_port:").Append(serverConfig.server_port).Internal();
+    Log->Append("serverConfig.max_open_sockets:").Append(serverConfig.max_open_sockets).Internal();
+    Log->Append("serverConfig.max_uri_handlers:").Append(serverConfig.max_uri_handlers).Internal();
+    Log->Append("serverConfig.max_resp_headers:").Append(serverConfig.max_resp_headers).Internal();
+    Log->Append("serverConfig.backlog_conn:").Append(serverConfig.backlog_conn).Internal();
+    Log->Append("serverConfig.lru_purge_enable:").Append(serverConfig.lru_purge_enable).Internal();
+    Log->Append("serverConfig.recv_wait_timeout:").Append(serverConfig.recv_wait_timeout).Internal();
+    Log->Append("serverConfig.stack_size:").Append(serverConfig.stack_size).Internal();
+    Log->Append("serverConfig.task_priority:").Append(serverConfig.task_priority).Internal();
+    Log->Append("serverConfig.core_id:").Append(serverConfig.core_id).Internal();
+    Log->Append("serverConfig.ctrl_port:").Append(serverConfig.ctrl_port).Internal();
+    Log->Append("Free heap: ").Append(esp_get_free_heap_size()).Internal();
+    */
     if (httpd_start(&server, &serverConfig) == ESP_OK)
     {
         // Register WebSocket handler
@@ -522,11 +590,15 @@ void SigmaWsServer::sendPing()
     clientsToRemove.clear();
     for (auto it = clients.begin(); it != clients.end(); it++)
     {
-        Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append(it->second.pingType).Append("#").Append(it->second.pingRetryCount).Internal();
+        Log->Append("PingTask: client:").Append(it->second.clientId).Append("#").Append("#").Append(it->second.pingRetryCount).Internal();
         bool res = sendPingToClient(it->second, "PING", false);
         if (!res)
         {
             Log->Append("Failed to send ping to client:").Append(it->second.clientId).Append("#").Append(it->second.pingRetryCount).Error();
+        }
+        else
+        {
+            Log->Append("Ping sent to client:").Append(it->second.clientId).Internal();
         }
         it->second.pingRetryCount--;
         if (it->second.pingRetryCount < 0)
@@ -547,17 +619,21 @@ void SigmaWsServer::sendPing()
 bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRemoveClient)
 {
     bool res = false;
-    if (auth.pingType == NO_PING)
+    PingType pingType = allowableClients[auth.clientId].pingType;
+    if (pingType == NO_PING)
     {
+        Serial.printf("sendPingToClient: NO_PING\n");
         res = true;
     }
-    if (auth.pingType == PING_ONLY_TEXT)
+    if (pingType == PING_ONLY_TEXT)
     {
+        Serial.printf("sendPingToClient: PING_ONLY_TEXT\n");
         sendMessageToClient(auth, "PING");
         res = true;
     }
-    else if (auth.pingType == PING_ONLY_BINARY)
+    else if (pingType == PING_ONLY_BINARY)
     {
+        Serial.printf("sendPingToClient: PING_ONLY_BINARY\n");
         res = sendPingToClient(auth.socketNumber, "PING");
     }
     if (!res)
@@ -580,22 +656,23 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRe
 bool SigmaWsServer::sendPongToClient(ClientAuth &auth, String payload)
 {
     bool res = false;
-    if (auth.pingType == NO_PING)
+    PingType pingType = allowableClients[auth.clientId].pingType;
+    if (pingType == NO_PING)
     {
         res = true;
     }
-    if (auth.pingType == PING_ONLY_TEXT)
+    if (pingType == PING_ONLY_TEXT)
     {
         sendMessageToClient(auth, "PONG");
         res = true;
     }
-    else if (auth.pingType == PING_ONLY_BINARY)
+    else if (pingType == PING_ONLY_BINARY)
     {
-        res = sendPingToClient(auth, "PING");
+        res = sendPongToClient(auth, "PONG");
     }
     if (!res)
     {
-        Log->Append("Failed to send ping to client:").Append(auth.clientId).Append("#").Append(auth.pingRetryCount).Error();
+        Log->Append("Failed to send pong to client:").Append(auth.clientId).Append("#").Append(auth.pingRetryCount).Error();
     }
     auth.pingRetryCount--;
     if (auth.pingRetryCount < 0)
@@ -640,9 +717,13 @@ bool SigmaWsServer::sendPingToClient(int32_t socketNumber, String message)
         .final = 1,
         .fragmented = 0,
         .type = HTTPD_WS_TYPE_PING,
-        .payload = (uint8_t *)message.c_str(),
-        .len = message.length()};
-    return (ESP_OK == httpd_ws_send_frame_async(server, socketNumber, &text_frame));
+        //.payload = (uint8_t *)message.c_str(),
+        //.len = message.length()
+        .payload = NULL,
+        .len = 0};
+    esp_err_t ret = httpd_ws_send_frame_async(server, socketNumber, &text_frame);
+    Serial.printf("sendPingToClient: ret: %d\n", ret);
+    return (ESP_OK == ret);
 }
 
 void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)

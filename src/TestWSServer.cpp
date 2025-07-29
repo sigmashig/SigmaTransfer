@@ -176,7 +176,7 @@ void setup()
   wsServerConfig.enabled = true;
   wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
   wsServerConfig.enabled = true;
-  wsServerConfig.pingInterval = 10000;
+  wsServerConfig.pingInterval = 10;
   wsServerConfig.pingRetryCount = 3;
   SigmaWsServer *wsServer = new SigmaWsServer(wsServerConfig, Log);
   wsServer->AddAllowableClient("RM_C_Green01", "secret-api-key-12345", PING_ONLY_TEXT);

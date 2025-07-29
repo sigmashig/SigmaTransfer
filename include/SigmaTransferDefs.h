@@ -132,9 +132,9 @@ typedef struct
     byte authType = AUTH_TYPE_NONE;
     bool enabled = true;
     int retryConnectingCount = 3;
-    int retryConnectingDelay = 5000; // 5 second
-    int pingInterval = 60000;        // 60 seconds
-    int pingRetryCount = 3;          // reconnect after 3 pings
+    int retryConnectingDelay = 5; // 5 second
+    int pingInterval = 60;        // 60 seconds
+    int pingRetryCount = 3;       // reconnect after 3 pings
 } WSClientConfig;
 
 typedef enum
@@ -160,8 +160,8 @@ typedef struct
     byte maxConnectionsPerClient = 1;
     bool enabled = true;
     std::map<String, AllowableClient> allowableClients;
-    int pingInterval = 60000; // 60 seconds
-    int pingRetryCount = 3;   // disconnect after 3 pings
+    int pingInterval = 60;  // 60 seconds
+    int pingRetryCount = 3; // disconnect after 3 pings
 } WSServerConfig;
 
 typedef enum

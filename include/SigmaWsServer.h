@@ -18,17 +18,26 @@ typedef struct FullAddress
     uint port;
 } FullAddress;
 
+typedef struct TransferPkg
+{
+    httpd_handle_t server;
+    int32_t socketNumber;
+    byte type;
+    String message;
+    void *buffer;
+    size_t len;
+} TransferPkg;
+
 typedef struct ClientAuth
 {
     String clientId = ""; // the string ID as provided by client
     FullAddress fullAddress = {IPAddress(0, 0, 0, 0), 0};
     int32_t socketNumber = 0;
     bool isAuth = false;
-    PingType pingType = NO_PING;
+    // PingType pingType = NO_PING;
     int pingRetryCount = 3;
     // ClientAuth() : clientId(""), fullAddress{IPAddress(0, 0, 0, 0), 0}, isAuth(false), pingType(NO_PING), pingRetryCount(3) {}
 } ClientAuth;
-
 
 class SigmaWsServer : public SigmaConnection
 {
@@ -56,6 +65,7 @@ public:
         client.authKey = authKey;
         client.pingType = pingType;
         allowableClients[clientId] = client;
+        Serial.printf("AddAllowableClient: clientId: %s, authKey: %s, pingType: %d\n", client.clientId.c_str(), client.authKey.c_str(), client.pingType);
     }
 
     void AddAllowableClient(AllowableClient client)
@@ -79,7 +89,7 @@ public:
     }
 
 private:
-    httpd_handle_t server;
+    httpd_handle_t server = NULL;
     WSServerConfig config;
     std::map<String, AllowableClient> allowableClients; // clientId -> AllowableClients
     std::map<int32_t, ClientAuth> clients;              // socketNumber -> ClientAuth
