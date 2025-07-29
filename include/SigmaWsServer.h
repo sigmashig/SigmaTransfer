@@ -105,6 +105,7 @@ private:
     void sendPing();
 
     static esp_err_t onWsEvent(httpd_req_t *req);
+    static void sendWSFrame(void *arg);
     static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     bool isClientAvailable(String clientId, String authKey);
     bool sendMessageToClient(int32_t socketNumber, String message);
@@ -157,3 +158,4 @@ private:
 };
 
 #endif
+

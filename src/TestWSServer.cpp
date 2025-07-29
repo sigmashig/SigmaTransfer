@@ -179,7 +179,7 @@ void setup()
   wsServerConfig.pingInterval = 10;
   wsServerConfig.pingRetryCount = 3;
   SigmaWsServer *wsServer = new SigmaWsServer(wsServerConfig, Log);
-  wsServer->AddAllowableClient("RM_C_Green01", "secret-api-key-12345", PING_ONLY_TEXT);
+  wsServer->AddAllowableClient("RM_C_Green01", "secret-api-key-12345", PING_ONLY_BINARY);
 
   protocol = wsServer;
   Log->Append("WS Server created").Internal();
