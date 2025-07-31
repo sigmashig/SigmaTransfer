@@ -35,7 +35,7 @@ public:
 
 private:
     WSClientConfig config;
-    bool isReady = false;
+    //bool isReady = false;
     // inline static AsyncClient wsClient;
     bool shouldConnect = true;
     int pingRetryCount = 0;

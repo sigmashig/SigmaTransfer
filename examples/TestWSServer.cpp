@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <SigmaWsClient.h>
+#include <SigmaWsServer.h>
 #include <SigmaAsyncNetwork.h>
 
 SigmaLoger *Log;
@@ -9,6 +9,16 @@ SigmaConnection *protocol = NULL;
 void TestPingPong()
 {
 }
+
+/*
+void TestSuite1()
+{
+  String payload = "Please, respond {'topic':'topic1','payload':'OK'}";
+  SigmaInternalPkg pkg("topic1", payload.c_str());
+  Log->Append("Sending message:").Append(pkg.GetPkgString()).Internal();
+  esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+}
+*/
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -159,25 +169,24 @@ void setup()
   }
   Log->Append("Creating WS Server").Internal();
 
-  WSClientConfig wsClientConfig;
+  WSServerConfig wsServerConfig;
+  wsServerConfig.port = 8080;
+  wsServerConfig.rootPath = "/";
+  wsServerConfig.enabled = true;
+  wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  wsServerConfig.pingInterval = 10;
+  wsServerConfig.pingRetryCount = 3;
+  SigmaWsServer *wsServer = new SigmaWsServer(wsServerConfig, Log);
+  wsServer->AddAllowableClient("RM_C_Green01", "secret-api-key-12345");
 
-  wsClientConfig.host = "ws://192.168.0.47";
-  wsClientConfig.port = 8080;
-  wsClientConfig.enabled = true;
-  wsClientConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
-  wsClientConfig.apiKey = "secret-api-key-12345";
-  wsClientConfig.pingInterval = 10;
-  wsClientConfig.pingRetryCount = 3;
-  SigmaWsClient *wsClient = new SigmaWsClient(wsClientConfig, Log);
-
-  protocol = wsClient;
+  protocol = wsServer;
   Log->Append("WS Server created").Internal();
   espErr = esp_event_handler_instance_register_with(
-      wsClient->GetEventLoop(),
-      wsClient->GetEventBase(), // ESP_EVENT_ANY_BASE,
+      wsServer->GetEventLoop(),
+      wsServer->GetEventBase(), // ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       protocolEventHandler,
-      wsClient,
+      wsServer,
       NULL);
   if (espErr != ESP_OK)
   {

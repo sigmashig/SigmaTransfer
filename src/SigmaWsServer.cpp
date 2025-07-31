@@ -11,14 +11,6 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     pingInterval = config.pingInterval;
     retryConnectingDelay = 0; // No reconnect required
 
-    Log->Append("SigmaWsServer: ").Append(name).Internal();
-    Log->Append("AuthType:").Append(config.authType).Internal();
-    Log->Append("MaxClients:").Append(config.maxClients).Internal();
-    Log->Append("MaxConnectionsPerClient:").Append(config.maxConnectionsPerClient).Internal();
-
-    // xQueue = xQueueCreate(10, sizeof(SigmaWsServerData));
-    // xTaskCreate(processData, "ProcessData", 4096, this, 1, NULL);
-
     esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SigmaAsyncNetwork::GetEventBase(), ESP_EVENT_ANY_ID, networkEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
     // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
@@ -34,8 +26,6 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
 
     serverConfig.server_port = config.port;
     serverConfig.max_open_sockets = config.maxClients;
-
-    // httpd_handle_t server = NULL;
 
     allowableClients.clear();
     for (auto it = config.allowableClients.begin(); it != config.allowableClients.end(); it++)
@@ -271,7 +261,7 @@ void SigmaWsServer::processData(void *arg)
                     esp_err_t ret = httpd_ws_recv_frame(req, &wsPkg, 0);
                     if (ret != ESP_OK)
                     {
-                        serv->Log->Printf("Packange from client can't be processed. Error:%d", ret).Error();
+                        serv->Log->Printf("Package from client can't be processed. Error:%d", ret).Error();
                     }
                     else
                     {
@@ -603,17 +593,17 @@ void SigmaWsServer::sendPing()
 bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRemoveClient)
 {
     bool res = false;
-    PingType pingType = allowableClients[auth.clientId].pingType;
-    if (pingType == NO_PING)
+    PingType pingType = auth.pingType;
+    if (pingType == PING_NO)
     {
         res = true;
     }
-    if (pingType == PING_ONLY_TEXT)
+    if (pingType == PING_TEXT)
     {
         sendMessageToClient(auth, "PING");
         res = true;
     }
-    else if (pingType == PING_ONLY_BINARY)
+    else if (pingType == PING_BINARY)
     {
         res = sendPingToClient(auth.socketNumber, "PING");
     }
@@ -637,17 +627,17 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRe
 bool SigmaWsServer::sendPongToClient(ClientAuth &auth, String payload)
 {
     bool res = false;
-    PingType pingType = allowableClients[auth.clientId].pingType;
-    if (pingType == NO_PING)
+    PingType pingType = auth.pingType;
+    if (pingType == PING_NO)
     {
         res = true;
     }
-    if (pingType == PING_ONLY_TEXT)
+    if (pingType == PING_TEXT)
     {
         sendMessageToClient(auth, "PONG");
         res = true;
     }
-    else if (pingType == PING_ONLY_BINARY)
+    else if (pingType == PING_BINARY)
     {
         res = sendPongToClient(auth, "PONG");
     }

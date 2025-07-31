@@ -64,6 +64,8 @@ void SigmaConnection::pingTask(TimerHandle_t xTimer)
     SigmaConnection *conn = (SigmaConnection *)pvTimerGetTimerID(xTimer);
     if (conn->IsReady())
     {
+        conn->Log->Append("[pingTask]Retrying:").Append(conn->retryConnectingCount).Internal();
+        //        conn->Log->Append("[pingTask]Sending ping").Internal();
         conn->sendPing();
     }
 }
@@ -93,14 +95,26 @@ void SigmaConnection::clearReconnectTimer(SigmaConnection *conn)
 
 void SigmaConnection::setPingTimer(SigmaConnection *conn)
 {
-    conn->Log->Append("[setPingTimer]:").Append(conn->pingInterval).Internal();
+    conn->Log->Append("[setPingTimer]").Internal();
     if (conn->pingInterval > 0)
     {
         if (conn->pingTimer == nullptr)
         {
             conn->pingTimer = xTimerCreate("pingTimer", pdMS_TO_TICKS(conn->pingInterval * 1000), pdTRUE, conn, pingTask);
         }
-        xTimerReset(conn->pingTimer, 0);
+        if (conn->pingTimer != nullptr)
+        {
+            conn->Log->Append("[setPingTimer]Resetting ping timer").Internal();
+            xTimerReset(conn->pingTimer, 0);
+        }
+        else
+        {
+            conn->Log->Append("[setPingTimer]Failed to create ping timer").Internal();
+        }
+    }
+    else
+    {
+        conn->Log->Append("[setPingTimer]Ping interval is 0").Internal();
     }
 }
 
@@ -160,13 +174,13 @@ PingType SigmaConnection::PingTypeFromString(String typeName)
 {
     if (typeName == "PING_ONLY_TEXT")
     {
-        return PING_ONLY_TEXT;
+        return PING_TEXT;
     }
     else if (typeName == "PING_ONLY_BINARY")
     {
-        return PING_ONLY_BINARY;
+        return PING_BINARY;
     }
-    return NO_PING;
+    return PING_NO;
 }
 
 TopicSubscription *SigmaConnection::GetSubscription(String topic)

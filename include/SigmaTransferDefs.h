@@ -121,6 +121,12 @@ typedef enum
     AUTH_TYPE_FIRST_MESSAGE = 0x04,
     AUTH_TYPE_ALL_MESSAGES = 0x08 // All messages are authenticated. No Binary Data. Text/Sigma Only. Converted to Json
 } AuthType;
+typedef enum
+{
+    PING_NO = 0,
+    PING_TEXT = 1,
+    PING_BINARY = 2,
+} PingType;
 
 typedef struct
 {
@@ -133,22 +139,17 @@ typedef struct
     bool enabled = true;
     int retryConnectingCount = 3;
     int retryConnectingDelay = 5; // 5 second
+    PingType pingType = PING_NO;
     int pingInterval = 60;        // 60 seconds
     int pingRetryCount = 3;       // reconnect after 3 pings
 } WSClientConfig;
 
-typedef enum
-{
-    NO_PING = 0,
-    PING_ONLY_TEXT = 1,
-    PING_ONLY_BINARY = 2,
-} PingType;
 
 typedef struct
 {
     String clientId;
     String authKey;
-    PingType pingType = PING_ONLY_TEXT;
+ //   PingType pingType = PING_TEXT;
 } AllowableClient;
 
 typedef struct
@@ -162,6 +163,7 @@ typedef struct
     std::map<String, AllowableClient> allowableClients;
     int pingInterval = 60;  // 60 seconds
     int pingRetryCount = 3; // disconnect after 3 pings
+    PingType pingType = PING_TEXT;
 } WSServerConfig;
 
 typedef enum

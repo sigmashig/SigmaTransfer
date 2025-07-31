@@ -34,7 +34,7 @@ typedef struct ClientAuth
     FullAddress fullAddress = {IPAddress(0, 0, 0, 0), 0};
     int32_t socketNumber = 0;
     bool isAuth = false;
-    // PingType pingType = NO_PING;
+    PingType pingType = PING_NO;
     int pingRetryCount = 3;
     // ClientAuth() : clientId(""), fullAddress{IPAddress(0, 0, 0, 0), 0}, isAuth(false), pingType(NO_PING), pingRetryCount(3) {}
 } ClientAuth;
@@ -58,14 +58,13 @@ public:
     SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority = 5);
     ~SigmaWsServer();
 
-    void AddAllowableClient(String clientId, String authKey, PingType pingType = PING_ONLY_TEXT)
+    void AddAllowableClient(String clientId, String authKey)
     {
         AllowableClient client;
         client.clientId = clientId;
         client.authKey = authKey;
-        client.pingType = pingType;
         allowableClients[clientId] = client;
-        Serial.printf("AddAllowableClient: clientId: %s, authKey: %s, pingType: %d\n", client.clientId.c_str(), client.authKey.c_str(), client.pingType);
+        Serial.printf("AddAllowableClient: clientId: %s, authKey: %s, pingType: %d\n", client.clientId.c_str(), client.authKey.c_str());
     }
 
     void AddAllowableClient(AllowableClient client)
@@ -158,4 +157,3 @@ private:
 };
 
 #endif
-

@@ -11,8 +11,8 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     config = _config;
     retryConnectingCount = config.retryConnectingCount;
     retryConnectingDelay = config.retryConnectingDelay;
-    pingInterval = 0;   // config.pingInterval;
-    pingRetryCount = 0; // config.pingRetryCount;
+    pingInterval = config.pingInterval;
+    pingRetryCount = config.pingRetryCount;
 
     wsClientConfig = {};
     wsClientConfig.uri = config.host.c_str();
@@ -22,16 +22,25 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     wsClientConfig.task_prio = 1;
     wsClientConfig.task_stack = 4096;
     wsClientConfig.buffer_size = 1024;
-    wsClientConfig.ping_interval_sec = config.pingInterval;
-    wsClientConfig.pingpong_timeout_sec = 20;
-    wsClientConfig.disable_pingpong_discon = true;
+    if (config.pingType == PING_BINARY)
+    {
+        wsClientConfig.ping_interval_sec = config.pingInterval;
+        wsClientConfig.pingpong_timeout_sec = 20;
+        wsClientConfig.disable_pingpong_discon = true;
+    }
+    else
+    {
+        wsClientConfig.ping_interval_sec = 0;
+        wsClientConfig.pingpong_timeout_sec = 0;
+        wsClientConfig.disable_pingpong_discon = false;
+    }
     wsClientConfig.keep_alive_enable = true;
 
     if (config.authType & AUTH_TYPE_BASIC)
     {
         Log->Append("Using Basic Authentication").Internal();
         String authRec = "Authorization: Basic \r\n";
-        authRec+="Bearer:"+config.apiKey+"\r\n";
+        authRec += "Bearer:" + config.apiKey + "\r\n";
         /*
         char *buffer;
         int bufferLen = base64_encode_expected_len(config.apiKey.length());
@@ -59,13 +68,13 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
         Log->Append("Failed to register WebSocket events: ").Append(esp_err_to_name(err)).Internal();
         return;
     }
-/*
-    err = esp_websocket_client_start(wsClient);
-    if (err != ESP_OK)
-    {
-        Log->Append("Failed to start WebSocket client: ").Append(esp_err_to_name(err)).Internal();
-    }
-*/
+    /*
+        err = esp_websocket_client_start(wsClient);
+        if (err != ESP_OK)
+        {
+            Log->Append("Failed to start WebSocket client: ").Append(esp_err_to_name(err)).Internal();
+        }
+    */
     err = esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SigmaAsyncNetwork::GetEventBase(), ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (err != ESP_OK)
     {
@@ -83,11 +92,13 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
         Log->Append("Failed to register protocol[PROTOCOL_SEND_RAW_TEXT_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
     }
 
-    pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval), pdTRUE, this, pingTask);
-    if (pingTimer == NULL)
-    {
-        Log->Append("Failed to create ping timer").Internal();
-    }
+    setPingTimer(this);
+    // pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval*1000), pdTRUE, this, pingTask);
+    // Log->Append("[SigmaWsClient]PingTimer created:").Append(config.pingInterval).Internal();
+    // if (pingTimer == NULL)
+    //{
+    //     Log->Append("Failed to create ping timer").Internal();
+    // }
 }
 
 void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -270,7 +281,7 @@ void SigmaWsClient::onConnect(esp_websocket_event_data_t &arg, SigmaWsClient *ws
     {
         ws->sendAuthMessage();
     }
-    //ws->setReconnectTimer(ws);
+    // ws->setReconnectTimer(ws);
 }
 
 void SigmaWsClient::sendAuthMessage()
@@ -279,6 +290,8 @@ void SigmaWsClient::sendAuthMessage()
     doc["type"] = "auth";
     doc["authKey"] = config.apiKey;
     doc["clientId"] = config.clientId;
+    doc["pingType"] = config.pingType == PING_TEXT ? "PING_TEXT" : config.pingType == PING_BINARY ? "PING_BINARY"
+                                                                                                  : "PING_NO";
     String jsonStr;
     serializeJson(doc, jsonStr);
     sendWebSocketTextFrame(jsonStr, true);
@@ -310,7 +323,27 @@ void SigmaWsClient::onDisconnect(esp_websocket_event_data_t &arg, SigmaWsClient 
 void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
 {
     ws->pingRetryCount = ws->config.pingRetryCount;
-    if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
+    String UpperPayload = payload;
+    UpperPayload.toUpperCase();
+    if (UpperPayload.startsWith("PING"))
+    {
+        ws->Log->Append("Received PING frame").Internal();
+        esp_websocket_client_send_text(ws->wsClient, "PONG", 4, portMAX_DELAY);
+        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING,
+                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+    }
+    else if (UpperPayload.startsWith("PONG"))
+    {
+        ws->Log->Append("Received textPONG frame").Internal();
+        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG,
+                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+    }
+    else if (UpperPayload.startsWith("CLOSE"))
+    {
+        ws->Log->Append("Received CLOSE frame").Internal();
+        ws->Disconnect();
+    }
+    else if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
     {
         ws->Log->Append("Received SigmaInternalPkg").Internal();
         SigmaInternalPkg pkg(payload);
@@ -325,24 +358,8 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     }
     else
     {
-        if (payload.startsWith("PING") || payload.startsWith("ping"))
-        {
-            ws->Log->Append("Received PING frame").Internal();
-            esp_websocket_client_send_text(ws->wsClient, "PONG", 4, portMAX_DELAY);
-            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING,
-                              (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
-        }
-        else if (payload.startsWith("PONG") || payload.startsWith("pong"))
-        {
-            ws->Log->Append("Received textPONG frame").Internal();
-            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG,
-                              (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
-        }
-        else
-        {
-            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
-                              (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
-        }
+        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
+                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
     }
 }
 
@@ -375,7 +392,7 @@ void SigmaWsClient::onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws)
     case WS_DISCONNECT:
     {
         ws->Log->Append("Received CLOSE frame").Internal();
-        //ws->setReady(false);
+        // ws->setReady(false);
         ws->Disconnect();
         break;
     }
@@ -421,7 +438,7 @@ bool SigmaWsClient::sendWebSocketTextFrame(const String &payload, bool isAuth)
     {
         Log->Append("[WS:C->S]:").Append(payload).Internal();
     }
-    //int payloadLen = payload.length();
+    // int payloadLen = payload.length();
     String message = payload;
     if (config.authType & AUTH_TYPE_ALL_MESSAGES)
     {
@@ -429,40 +446,47 @@ bool SigmaWsClient::sendWebSocketTextFrame(const String &payload, bool isAuth)
         // Text frame
 
         JsonDocument doc;
-        
+
         doc["apiKey"] = config.apiKey;
         doc["client"] = config.clientId;
         doc["data"] = payload;
         serializeJson(doc, message);
-
     }
 
     return 0 <= esp_websocket_client_send_text(wsClient, message.c_str(), message.length(), portMAX_DELAY) == ESP_OK;
-    //return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_TEXT, isAuth);
+    // return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_TEXT, isAuth);
 }
 
 bool SigmaWsClient::sendWebSocketBinaryFrame(const byte *data, size_t size)
 {
     return 0 <= esp_websocket_client_send_bin(wsClient, (const char *)data, size, portMAX_DELAY) == ESP_OK;
-    //return sendWebSocketFrame(data, size, WS_BINARY);
+    // return sendWebSocketFrame(data, size, WS_BINARY);
 }
 
 bool SigmaWsClient::sendWebSocketPingFrame(const String &payload)
 {
-    return false; //TODO: Implement
-    //return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PING);
+    if (config.pingType == PING_TEXT)
+    {
+        return sendWebSocketTextFrame("PING:" + payload, true);
+    }
+    return true;
+    // return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PING);
 }
 
 bool SigmaWsClient::sendWebSocketPongFrame(const String &payload)
 {
-    return false; //TODO: Implement
-    //return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PONG);
+    if (config.pingType == PING_TEXT)
+    {
+        return sendWebSocketTextFrame("PONG:" + payload, true);
+    }
+    return true;
+    // return sendWebSocketFrame((const byte *)payload.c_str(), payload.length(), WS_PONG);
 }
 
 bool SigmaWsClient::sendWebSocketCloseFrame()
-{   
+{
     return esp_websocket_client_close(wsClient, portMAX_DELAY) == ESP_OK;
-    //return sendWebSocketFrame(nullptr, 0, WS_DISCONNECT);
+    // return sendWebSocketFrame(nullptr, 0, WS_DISCONNECT);
 }
 
 /*

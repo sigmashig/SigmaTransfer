@@ -1,25 +1,14 @@
 #include <Arduino.h>
-#include <SigmaWsServer.h>
+#include <SigmaWsClient.h>
 #include <SigmaAsyncNetwork.h>
 
 SigmaLoger *Log;
 
 SigmaConnection *protocol = NULL;
 
-
 void TestPingPong()
 {
 }
-
-/*
-void TestSuite1()
-{
-  String payload = "Please, respond {'topic':'topic1','payload':'OK'}";
-  SigmaInternalPkg pkg("topic1", payload.c_str());
-  Log->Append("Sending message:").Append(pkg.GetPkgString()).Internal();
-  esp_event_post_to(protocol->GetEventLoop(), protocol->GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, (void *)pkg.GetPkgString().c_str(), pkg.GetPkgString().length() + 1, portMAX_DELAY);
-}
-*/
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -105,39 +94,6 @@ void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_i
     Log->Append("Network is NULL").Internal();
     return;
   }
-  Log->Append("Base: ").Append(event_base).Append(" ID: ").Append(event_id).Internal();
-  if (event_id = PROTOCOL_AP_CONNECTED)
-  {
-    Log->Append("PROTOCOL_AP_CONNECTED").Internal();
-  }
-  else if (event_id = PROTOCOL_STA_CONNECTED)
-  {
-    Log->Append("PROTOCOL_STA_CONNECTED").Internal();
-  }
-  else if (event_id = PROTOCOL_AP_DISCONNECTED)
-  {
-    Log->Append("PROTOCOL_AP_DISCONNECTED").Internal();
-  }
-  else if (event_id = PROTOCOL_STA_DISCONNECTED)
-  {
-    Log->Append("PROTOCOL_STA_DISCONNECTED").Internal();
-  }
-  else if (event_id = PROTOCOL_ERROR)
-  {
-    Log->Append("PROTOCOL_ERROR").Internal();
-  }
-  else if (event_id = PROTOCOL_RECEIVED_PING)
-  {
-    Log->Append("PROTOCOL_RECEIVED_PING").Internal();
-  }
-  else if (event_id = PROTOCOL_RECEIVED_PONG)
-  {
-    Log->Append("PROTOCOL_RECEIVED_PONG").Internal();
-  }
-  else
-  {
-    Log->Internal("Unknown event");
-  }
 }
 
 void setup()
@@ -168,27 +124,28 @@ void setup()
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
     exit(1);
   }
-  Log->Append("Creating WS Server").Internal();
+  Log->Append("Creating WS Client").Internal();
 
-  WSServerConfig wsServerConfig;
-  wsServerConfig.port = 8080;
-  wsServerConfig.rootPath = "/";
-  wsServerConfig.enabled = true;
-  wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
-  wsServerConfig.enabled = true;
-  wsServerConfig.pingInterval = 10;
-  wsServerConfig.pingRetryCount = 3;
-  SigmaWsServer *wsServer = new SigmaWsServer(wsServerConfig, Log);
-  wsServer->AddAllowableClient("RM_C_Green01", "secret-api-key-12345", PING_ONLY_BINARY);
+  WSClientConfig wsClientConfig;
 
-  protocol = wsServer;
-  Log->Append("WS Server created").Internal();
+  wsClientConfig.host = "ws://192.168.0.47";
+  wsClientConfig.port = 8080;
+  wsClientConfig.enabled = true;
+  wsClientConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  wsClientConfig.apiKey = "secret-api-key-12345";
+  wsClientConfig.pingType = PING_TEXT;
+  wsClientConfig.pingInterval = 10;
+  wsClientConfig.pingRetryCount = 3;
+  SigmaWsClient *wsClient = new SigmaWsClient(wsClientConfig, Log);
+
+  protocol = wsClient;
+  Log->Append("WS Client created").Internal();
   espErr = esp_event_handler_instance_register_with(
-      wsServer->GetEventLoop(),
-      wsServer->GetEventBase(), // ESP_EVENT_ANY_BASE,
+      wsClient->GetEventLoop(),
+      wsClient->GetEventBase(), // ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       protocolEventHandler,
-      wsServer,
+      wsClient,
       NULL);
   if (espErr != ESP_OK)
   {
