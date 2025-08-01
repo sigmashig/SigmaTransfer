@@ -91,6 +91,11 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     {
         Log->Append("Failed to register protocol[PROTOCOL_SEND_RAW_TEXT_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
     }
+    err = esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
+    if (err != ESP_OK)
+    {
+        Log->Append("Failed to register protocol[PROTOCOL_SEND_SIGMA_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
+    }
 
     setPingTimer(this);
     // pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval*1000), pdTRUE, this, pingTask);
@@ -118,6 +123,7 @@ void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base,
     }
     else if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
     {
+        Serial.printf("PROTOCOL_SEND_SIGMA_MESSAGE: %s\n", (char *)event_data);
         SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
         ws->sendWebSocketTextFrame(pkg.GetPkgString());
     }
@@ -487,6 +493,14 @@ bool SigmaWsClient::sendWebSocketCloseFrame()
 {
     return esp_websocket_client_close(wsClient, portMAX_DELAY) == ESP_OK;
     // return sendWebSocketFrame(nullptr, 0, WS_DISCONNECT);
+}
+
+void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
+{
+    subscriptionTopic.topic = config.rootPath.substring(1) + (config.rootPath.endsWith("/") ? "" : "/") + subscriptionTopic.topic;
+
+    addSubscription(subscriptionTopic);
+    Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
 }
 
 /*

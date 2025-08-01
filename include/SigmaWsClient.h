@@ -71,6 +71,7 @@ private:
     bool sendWebSocketPingFrame(const String &payload);
     bool sendWebSocketPongFrame(const String &payload);
     bool sendWebSocketCloseFrame();
+    void Subscribe(TopicSubscription subscriptionTopic);
 };
 
 #endif

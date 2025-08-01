@@ -172,11 +172,11 @@ AuthType SigmaConnection::AuthTypeFromString(String typeName)
 
 PingType SigmaConnection::PingTypeFromString(String typeName)
 {
-    if (typeName == "PING_ONLY_TEXT")
+    if (typeName == "PING_TEXT")
     {
         return PING_TEXT;
     }
-    else if (typeName == "PING_ONLY_BINARY")
+    else if (typeName == "PING_BINARY")
     {
         return PING_BINARY;
     }

@@ -111,6 +111,7 @@ private:
     bool sendPongToClient(int32_t socketNumber, String message);
     bool sendPingToClient(int32_t socketNumber, String message);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    void Subscribe(TopicSubscription subscriptionTopic);
     static void processData(void *arg);
     bool sendPingToClient(ClientAuth &auth, String payload, bool isRemoveClient = true);
     bool sendPongToClient(ClientAuth &auth, String payload);

@@ -66,7 +66,7 @@ esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
 void SigmaWsServer::sendWSFrame(void *arg)
 {
     TransferPkg *pkg = (TransferPkg *)arg;
-
+    
     httpd_ws_frame_t wsFrame = {
         .final = true,
         .fragmented = false};
@@ -386,18 +386,26 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
         else if (SigmaInternalPkg::IsSigmaInternalPkg(payloadStr))
         {
             SigmaInternalPkg pkg(payloadStr);
+            Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
             if (pkg.IsError())
             {
                 Log->Printf("Error in package: %s\n", pkg.GetPkgString().c_str()).Error();
             }
             else
             {
+                Log->Printf("Subscriptions:%d", subscriptions.size()).Internal();
+                for (auto it = subscriptions.begin(); it != subscriptions.end(); it++)
+                {
+                    Log->Printf("Subscription: %s", it->first.c_str()).Internal();
+                }
                 auto subscription = subscriptions.find(pkg.GetTopic());
                 if (subscription != subscriptions.end())
                 {
+                    Log->Printf("Sending event to subscription:").Append(subscription->second.eventId).Internal();
                     // server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
                     SendMessage(pkg.GetPayload(), subscription->second.eventId);
                 }
+                Log->Append("END").Internal();
                 SendMessage(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
             }
         }
@@ -439,8 +447,17 @@ bool SigmaWsServer::clientAuthRequest(httpd_req_t *req, String &request, ClientA
     }
     String cId = doc["clientId"].as<String>();
     String authKey = doc["authKey"].as<String>();
+    if (doc["pingType"].is<String>())
+    {
+        auth->pingType = SigmaConnection::PingTypeFromString(doc["pingType"].as<String>());
+    }
+    else
+    {
+        auth->pingType = PING_NO;
+    }
     Log->Append("Client ID:").Append(cId).Internal();
     Log->Append("Auth Key:").Append(authKey).Internal();
+    Log->Append("Ping Type:").Append(auth->pingType).Internal();
     if (isClientAvailable(cId, authKey))
     {
         if (req != NULL)
@@ -594,6 +611,7 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRe
 {
     bool res = false;
     PingType pingType = auth.pingType;
+    Log->Append("sendPingToClient:pingType:").Append(pingType).Internal();
     if (pingType == PING_NO)
     {
         res = true;
@@ -751,4 +769,13 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
         // Nothing to do here
         // ws->sendPongToClient(auth, pkg.GetPayload());
     }
+}
+
+void SigmaWsServer::Subscribe(TopicSubscription subscriptionTopic)
+{
+    subscriptionTopic.topic = config.rootPath.substring(1) + (config.rootPath.endsWith("/") ? "" : "/") + subscriptionTopic.topic;
+
+    addSubscription(subscriptionTopic);
+    Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
+    //esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
 }

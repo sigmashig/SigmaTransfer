@@ -65,6 +65,7 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         this->isError = true;
         return;
     }
+    Serial.printf("SigmaInternalPkg:msg=%s\n", msg);
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, msg);
     if (error)
