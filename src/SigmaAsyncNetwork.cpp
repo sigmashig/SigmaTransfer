@@ -1,6 +1,6 @@
 #include "SigmaAsyncNetwork.h"
-#include "WiFi.h"
-
+// #include "WiFi.h"
+#include "SigmaWiFi.h"
 
 SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
 {
@@ -14,16 +14,12 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
         }
         if (config.wifiConfig.enabled)
         {
-            mode = config.wifiConfig.wifiMode;
-            if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
-            {
-                wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
-            }
-            else
-            {
-                // mode == WIFI_MODE_AP
-                wifiStaReconnectTimer = nullptr;
-            }
+            wifi = new SigmaWiFi(config.wifiConfig, Log);
+        }
+        else
+        {
+            Log->Append("WiFi is disabled").Error();
+            wifi = nullptr;
         }
         esp_event_loop_args_t loop_args = {
             .queue_size = 100,
@@ -45,68 +41,32 @@ SigmaAsyncNetwork::~SigmaAsyncNetwork()
 {
 }
 
-void SigmaAsyncNetwork::reconnectWiFiSta(TimerHandle_t xTimer)
-{
-    WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
-}
-
 void SigmaAsyncNetwork::Connect()
 {
-    if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA)
+    if (wifi != nullptr)
     {
-        startWiFiSta();
+        wifi->Connect();
     }
 }
 
 void SigmaAsyncNetwork::Disconnect()
 {
+    if (wifi != nullptr)
+    {
+        wifi->Disconnect();
+    }
 }
 
-esp_err_t SigmaAsyncNetwork::postEvent(int32_t eventId, void *eventData, size_t eventDataSize)
+bool SigmaAsyncNetwork::IsConnected()
+{
+    if (wifi != nullptr)
+    {
+        return wifi->IsConnected();
+    }
+    return false;
+}
+
+esp_err_t SigmaAsyncNetwork::PostEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
     return esp_event_post_to(eventLoop, eventBase, eventId, eventData, eventDataSize, portMAX_DELAY);
-}
-void SigmaAsyncNetwork::startWiFiSta()
-{
-    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        switch (event)
-        {
-        case SYSTEM_EVENT_STA_GOT_IP:
-        {
-            xTimerStop(wifiStaReconnectTimer, portMAX_DELAY);
-            Log->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
-            isConnected = true;
-            IPAddress ip = WiFi.localIP();
-            postEvent(PROTOCOL_STA_CONNECTED, &ip, sizeof(ip));
-            break;
-        }
-        case SYSTEM_EVENT_STA_DISCONNECTED:
-        {
-            if (isConnected) {
-                Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
-                postEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
-            }
-            isConnected = false;
-            if (shouldConnect) {
-                xTimerStart(wifiStaReconnectTimer, portMAX_DELAY);
-            }
-            break;
-        }
-        case SYSTEM_EVENT_WIFI_READY:
-        case SYSTEM_EVENT_STA_START:
-        case SYSTEM_EVENT_STA_CONNECTED:
-        { // known event - do nothing
-            break;
-        }
-        default:
-        {
-//            Log->Append("WiFi event: ").Append(event).Internal();
-            break;
-        }
-        } });
-    // Log->Append("Connecting to network STA:").Append(config.wifiConfig.wifiSta.ssid).Append(":").Append(config.wifiConfig.wifiSta.password).Internal();
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(config.wifiConfig.wifiSta.ssid.c_str(), config.wifiConfig.wifiSta.password.c_str());
-    // Log->Append("Connecting to network STA end").Internal();
 }

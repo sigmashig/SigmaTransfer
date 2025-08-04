@@ -59,6 +59,7 @@ typedef struct
     String modeString;
     wifi_mode_t wifiMode = WIFI_MODE_STA;
     bool enabled = true;
+    bool shouldReconnect = true;
 } WiFiConfig;
 
 typedef struct

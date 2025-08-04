@@ -7,7 +7,7 @@
 #include <esp_event.h>
 #include "SigmaLoger.h"
 #include "SigmaTransferDefs.h"
-
+#include "SigmaWiFi.h"
 
 class SigmaAsyncNetwork
 {
@@ -16,12 +16,15 @@ public:
     ~SigmaAsyncNetwork();
     void Connect();
     void Disconnect();
-    static bool IsConnected() { return isConnected; };
+    static bool IsConnected();
     static esp_event_loop_handle_t GetEventLoop() { return eventLoop; };
     static esp_event_base_t GetEventBase() { return eventBase; };
+    static esp_err_t PostEvent(int32_t eventId, void *eventData = nullptr, size_t eventDataSize = 0);
 
 private:
     SigmaLoger *Log;
+    inline static SigmaWiFi *wifi = nullptr;
+
     inline static NetworkConfig config;
     inline static bool isConnected = false;
     bool shouldConnect = true;
@@ -30,10 +33,6 @@ private:
     TimerHandle_t wifiStaReconnectTimer;
     inline static esp_event_loop_handle_t eventLoop;
     inline static esp_event_base_t eventBase = "SigmaAsyncNetwork";
-
-    void startWiFiSta();
-    static void reconnectWiFiSta(TimerHandle_t xTimer);
-    esp_err_t postEvent(int32_t eventId, void *eventData = nullptr, size_t eventDataSize = 0);
 };
 
 #endif
