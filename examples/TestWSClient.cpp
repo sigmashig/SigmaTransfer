@@ -44,22 +44,6 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
     char *msg = (char *)event_data;
     Log->Append("PROTOCOL_CONNECTED:").Append(msg).Append("#").Internal();
   }
-  else if (event_id == PROTOCOL_AP_CONNECTED)
-  {
-    Log->Append("PROTOCOL_AP_CONNECTED").Internal();
-  }
-  else if (event_id == PROTOCOL_STA_CONNECTED)
-  {
-    Log->Append("PROTOCOL_STA_CONNECTED").Internal();
-  }
-  else if (event_id == PROTOCOL_AP_DISCONNECTED)
-  {
-    Log->Append("PROTOCOL_AP_DISCONNECTED").Internal();
-  }
-  else if (event_id == PROTOCOL_STA_DISCONNECTED)
-  {
-    Log->Append("PROTOCOL_STA_DISCONNECTED").Internal();
-  }
   else if (event_id == PROTOCOL_ERROR)
   {
     Log->Append("PROTOCOL_ERROR").Internal();
@@ -109,20 +93,29 @@ void setup()
   networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
   networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
   networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
-  networkConfig.wifiConfig.enabled = true;
-  networkConfig.ethernetConfig.enabled = false;
+  networkConfig.wifiConfig.enabled = false;
+  networkConfig.ethernetConfig.enabled = true;
+  networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
+  networkConfig.ethernetConfig.hardware.w5500.csPin = GPIO_NUM_5;
+  networkConfig.ethernetConfig.hardware.w5500.rstPin = GPIO_NUM_4;
+  networkConfig.ethernetConfig.dhcp = false;
+  networkConfig.ethernetConfig.ip = IPAddress(192, 168, 0, 222);
+  networkConfig.ethernetConfig.dns = IPAddress(8, 8, 8, 8);
+  networkConfig.ethernetConfig.gateway = IPAddress(192, 168, 0, 1);
+  networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
+  SigmaEthernet::GenerateMac(15, networkConfig.ethernetConfig.mac);
   SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log);
-  espErr = esp_event_handler_instance_register_with(
+ /* espErr = esp_event_handler_instance_register_with(
       SigmaAsyncNetwork::GetEventLoop(),
       ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       networkEventHandler,
       network,
-      NULL);
+      NULL);*/
+  //espErr = SigmaAsyncNetwork::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, network);
   if (espErr != ESP_OK)
   {
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();
-    exit(1);
   }
   Log->Append("Creating WS Client").Internal();
 
@@ -140,17 +133,10 @@ void setup()
 
   protocol = wsClient;
   Log->Append("WS Client created").Internal();
-  espErr = esp_event_handler_instance_register_with(
-      wsClient->GetEventLoop(),
-      wsClient->GetEventBase(), // ESP_EVENT_ANY_BASE,
-      ESP_EVENT_ANY_ID,
-      protocolEventHandler,
-      wsClient,
-      NULL);
+  espErr = wsClient->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, wsClient);
   if (espErr != ESP_OK)
   {
     Log->Printf("Failed to register event handler: %d", espErr).Internal();
-    exit(1);
   }
   Log->Append("event handler registered").Internal();
   Log->Append("Connecting to network").Internal();

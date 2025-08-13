@@ -16,11 +16,11 @@ public:
     void Subscribe(TopicSubscription subscriptionTopic);
     void Unsubscribe(String topic);
     // bool IsReady();
+    void Connect();
 
 private:
     MqttConfig config;
     void publish(SigmaInternalPkg *pkg);
-    void Connect();
     void Disconnect();
     void Close()
     {
@@ -28,10 +28,11 @@ private:
         Disconnect();
     };
     void sendPing() { /* nothing todo */ };
+    void init();
     bool shouldConnect = false;
     esp_mqtt_client_handle_t mqttClient;
     static void onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
-    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    // static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 };
 

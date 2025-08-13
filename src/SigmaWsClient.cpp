@@ -6,7 +6,7 @@
 #include <WiFi.h>
 #include <esp_event.h>
 
-SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", logger, priority)
+SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", _config.networkMode, logger, priority)
 {
     config = _config;
     retryConnectingCount = config.retryConnectingCount;
@@ -75,28 +75,19 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
             Log->Append("Failed to start WebSocket client: ").Append(esp_err_to_name(err)).Internal();
         }
     */
-    err = esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SigmaAsyncNetwork::GetEventBase(), ESP_EVENT_ANY_ID, networkEventHandler, this);
+    //err = esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SigmaAsyncNetwork::GetEventBase(), ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (err != ESP_OK)
     {
         Log->Append("Failed to register network event handler: ").Append(esp_err_to_name(err)).Internal();
     }
 
-    err = esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
+    err = RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, this);
     if (err != ESP_OK)
     {
-        Log->Append("Failed to register protocol[PROTOCOL_SEND_RAW_BINARY_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
-    }
-    err = esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
-    if (err != ESP_OK)
-    {
-        Log->Append("Failed to register protocol[PROTOCOL_SEND_RAW_TEXT_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
-    }
-    err = esp_event_handler_register_with(eventLoop, GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    if (err != ESP_OK)
-    {
-        Log->Append("Failed to register protocol[PROTOCOL_SEND_SIGMA_MESSAGE] event handler: ").Append(esp_err_to_name(err)).Internal();
+        Log->Append("Failed to register protocol event handler: ").Append(esp_err_to_name(err)).Internal();
     }
 
+ 
     setPingTimer(this);
     // pingTimer = xTimerCreate("PingTimer", pdMS_TO_TICKS(config.pingInterval*1000), pdTRUE, this, pingTask);
     // Log->Append("[SigmaWsClient]PingTimer created:").Append(config.pingInterval).Internal();
@@ -146,24 +137,24 @@ void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base,
         ws->Close();
     }
 }
-
-void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+/*
+void SigmaWsClient::Close()
 {
-    SigmaWsClient *ws = (SigmaWsClient *)arg;
-    if (event_id == PROTOCOL_STA_CONNECTED)
+    shouldConnect = false;
+    sendWebSocketCloseFrame();
+    if (wsClient != NULL)
     {
-        ws->Log->Append("[networkEventHandler]Network connected").Internal();
-        ws->Connect();
-        ws->clearReconnectTimer(ws);
+        esp_websocket_client_stop(wsClient);
+        esp_websocket_client_destroy(wsClient);
+        wsClient = NULL;
     }
-    else if (event_id == PROTOCOL_STA_DISCONNECTED)
-    {
-        ws->setReady(false);
-    }
+    clearReconnectTimer(this);
 }
+*/
 
 void SigmaWsClient::wsEventHandler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
+    Serial.printf("wsEventHandler: event_id=%d\n", event_id);
     SigmaWsClient *ws = (SigmaWsClient *)handler_args;
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
 
@@ -215,6 +206,7 @@ void SigmaWsClient::Connect()
         Log->Internal("WS cannot connect - network is not connected");
         return;
     }
+    clearReconnectTimer(this);
     String url = config.host;
     if (config.authType & AUTH_TYPE_URL)
     {
@@ -229,10 +221,11 @@ void SigmaWsClient::Connect()
     {
         Log->Append("[Connect]Failed to start WebSocket client: ").Append(esp_err_to_name(err)).Error();
     }
-
+    delay(5000);
     retryConnectingCount = config.retryConnectingCount;
     pingRetryCount = config.pingRetryCount;
     setReconnectTimer(this);
+    Log->Append("[Connect]Connected to WebSocket server").Internal();
 }
 
 void SigmaWsClient::Disconnect()
@@ -260,7 +253,7 @@ void SigmaWsClient::sendPing()
     if (pingRetryCount <= 0)
     {
         Disconnect();
-        esp_event_post_to(GetEventLoop(), GetEventBase(), PROTOCOL_PING_TIMEOUT, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
+        PostMessageEvent(GetName(), PROTOCOL_PING_TIMEOUT);
     }
     else
     {
@@ -312,7 +305,8 @@ void SigmaWsClient::setReady(bool ready)
     {
         retryConnectingCount = config.retryConnectingCount;
     }
-    esp_event_post_to(SigmaConnection::GetEventLoop(), GetEventBase(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
+   // esp_event_post_to(SigmaConnection::GetEventLoop(), GetEventBase(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED, (void *)(GetName().c_str()), GetName().length() + 1, portMAX_DELAY);
+   PostMessageEvent(GetName(), isReady ? PROTOCOL_CONNECTED : PROTOCOL_DISCONNECTED);
 }
 
 void SigmaWsClient::onDisconnect(esp_websocket_event_data_t &arg, SigmaWsClient *ws)
@@ -335,14 +329,16 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     {
         ws->Log->Append("Received PING frame").Internal();
         esp_websocket_client_send_text(ws->wsClient, "PONG", 4, portMAX_DELAY);
-        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING,
-                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING,
+        //                  (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_PING);
     }
     else if (UpperPayload.startsWith("PONG"))
     {
         ws->Log->Append("Received textPONG frame").Internal();
-        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG,
-                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG,
+        //                  (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_PONG);
     }
     else if (UpperPayload.startsWith("CLOSE"))
     {
@@ -353,27 +349,31 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     {
         ws->Log->Append("Received SigmaInternalPkg").Internal();
         SigmaInternalPkg pkg(payload);
-        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE,
-                          (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+        //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE,
+        //                  (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+        ws->PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
         TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
         if (subscription != nullptr)
         {
-            esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId,
-                              (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+            //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId,
+            //                  (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
+            ws->PostMessageEvent(pkg.GetPkgString(), subscription->eventId);
         }
     }
     else
     {
-        esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
-                          (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
+        //                  (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
+        ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE);
     }
 }
 
 void SigmaWsClient::onDataBinary(byte *payload, size_t payloadLen, SigmaWsClient *ws)
 {
     ws->Log->Append("Received Binary Data").Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE,
-                      (void *)(payload), payloadLen, portMAX_DELAY);
+    //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE,
+    //                  (void *)(payload), payloadLen, portMAX_DELAY);
+    ws->PostMessageEvent(String((char *)payload, payloadLen), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE);
 }
 
 void SigmaWsClient::onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws)
@@ -420,7 +420,8 @@ void SigmaWsClient::onError(esp_websocket_event_data_t &arg, SigmaWsClient *ws)
 {
     String errorStr = "[" + ws->GetName() + "] " + "WebSocket error: ";
     ws->Log->Append(errorStr).Internal();
-    esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length() + 1, portMAX_DELAY);
+    //esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_ERROR, (void *)errorStr.c_str(), errorStr.length() + 1, portMAX_DELAY);
+    ws->PostMessageEvent(errorStr, PROTOCOL_ERROR);
 }
 /*
 void SigmaWsClient::onTimeout(void *arg, AsyncClient *c, uint32_t time)

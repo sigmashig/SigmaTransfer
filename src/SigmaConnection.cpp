@@ -4,11 +4,13 @@
 #include <SigmaMQTT.h>
 #include <SigmaWSServer.h>
 #include <SigmaWSClient.h>
+#include <SigmaAsyncNetwork.h>
 
-SigmaConnection::SigmaConnection(String name, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
+SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
     this->Log = (logger != nullptr) ? logger : new SigmaLoger(0);
     this->name = name;
+    this->networkMode = networkMode;
     // messages = std::list<Message>();
     // queueMutex = xSemaphoreCreateMutex();
     esp_event_loop_args_t loop_args = {
@@ -22,12 +24,16 @@ SigmaConnection::SigmaConnection(String name, SigmaLoger *logger, uint priority,
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to create event loop: %d", espErr).Internal();
-        exit(1);
+    }
+    espErr = SigmaAsyncNetwork::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    if (espErr != ESP_OK)
+    {
+        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
     }
 }
-void SigmaConnection::SendMessage(String message, int eventId)
+void SigmaConnection::PostMessageEvent(String message, int eventId)
 {
-    esp_event_post_to(GetEventLoop(), GetEventBase(), eventId, (void *)(message.c_str()), message.length() + 1, portMAX_DELAY);
+    esp_event_post_to(eventLoop, eventBase, eventId, (void *)(message.c_str()), message.length() + 1, portMAX_DELAY);
 }
 
 SigmaConnection::~SigmaConnection()
@@ -126,6 +132,46 @@ void SigmaConnection::clearPingTimer(SigmaConnection *conn)
     }
 }
 
+void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    SigmaConnection *conn = (SigmaConnection *)arg;
+    //conn->Log->Append("[networkEventHandler]event_id=").Append(event_id).Internal();
+
+    switch (event_id)
+    {
+    case NETWORK_WAN_CONNECTED:
+    {
+        if (conn->networkMode == NETWORK_MODE_WAN)
+        {
+            //conn->Log->Append("[networkEventHandler]WAN connected").Internal();
+            conn->Connect();
+        }
+        break;
+    }
+    case NETWORK_LAN_CONNECTED:
+    {
+        if (conn->networkMode == NETWORK_MODE_LAN)
+        {
+            //conn->Log->Append("[networkEventHandler]LAN connected").Internal();
+            conn->Connect();
+        }
+        break;
+    }
+    case NETWORK_WAN_DISCONNECTED:
+    {
+        //conn->Log->Append("[networkEventHandler]WAN disconnected").Internal();
+        conn->Disconnect();
+        break;
+    }
+    case NETWORK_LAN_DISCONNECTED:
+    {
+        conn->Log->Append("[networkEventHandler]LAN disconnected").Internal();
+        conn->Disconnect();
+        break;
+    }
+    }
+}
+
 SigmaConnection *SigmaConnection::Create(SigmaProtocolType type, SigmaConnectionsConfig config, SigmaLoger *logger, uint priority)
 {
     switch (type)
@@ -181,6 +227,11 @@ PingType SigmaConnection::PingTypeFromString(String typeName)
         return PING_BINARY;
     }
     return PING_NO;
+}
+
+esp_err_t SigmaConnection::RegisterEventHandlers(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg)
+{
+    return esp_event_handler_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg);
 }
 
 TopicSubscription *SigmaConnection::GetSubscription(String topic)

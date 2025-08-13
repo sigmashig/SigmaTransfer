@@ -61,10 +61,9 @@ private:
     void onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
     void onError(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
     // static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
-    bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
+    //bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
     void setReady(bool ready);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void wsEventHandler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
     bool sendWebSocketTextFrame(const String &payload, bool isAuth = false);
     bool sendWebSocketBinaryFrame(const byte *data, size_t size);

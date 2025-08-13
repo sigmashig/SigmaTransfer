@@ -4,19 +4,16 @@
 #include <sys/socket.h>
 #include <vector>
 
-SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaConnection("SigmaWsServer", logger, priority)
+SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int priority) : SigmaConnection("SigmaWsServer", config.networkMode, logger, priority)
 {
     this->config = config;
     isReady = false;
     pingInterval = config.pingInterval;
     retryConnectingDelay = 0; // No reconnect required
 
-    esp_event_handler_register_with(SigmaAsyncNetwork::GetEventLoop(), SigmaAsyncNetwork::GetEventBase(), ESP_EVENT_ANY_ID, networkEventHandler, this);
-    // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_BINARY_MESSAGE, protocolEventHandler, this);
-    // esp_event_handler_register_with(SigmaProtocol::GetEventLoop(), this->name.c_str(), PROTOCOL_SEND_RAW_TEXT_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
-    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PING, protocolEventHandler, this);
-    esp_event_handler_register_with(GetEventLoop(), GetEventBase(), PROTOCOL_SEND_PONG, protocolEventHandler, this);
+    RegisterEventHandlers(PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
+    RegisterEventHandlers(PROTOCOL_SEND_PING, protocolEventHandler, this);
+    RegisterEventHandlers(PROTOCOL_SEND_PONG, protocolEventHandler, this);
     xQueue = xQueueCreate(10, sizeof(httpd_req_t *));
     requestSemaphore = xSemaphoreCreateBinaryStatic(&requestBuffer);
     xSemaphoreGive(requestSemaphore);
@@ -66,7 +63,7 @@ esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
 void SigmaWsServer::sendWSFrame(void *arg)
 {
     TransferPkg *pkg = (TransferPkg *)arg;
-    
+
     httpd_ws_frame_t wsFrame = {
         .final = true,
         .fragmented = false};
@@ -358,7 +355,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
             String payload = payloadStr;
             if (clientAuthRequest(req, payload, &clients[socketNumber], payloadStr))
             {
-                SendMessage(payload, PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE);
+                PostMessageEvent(payload, PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE);
             }
             else
             {
@@ -403,10 +400,10 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
                 {
                     Log->Printf("Sending event to subscription:").Append(subscription->second.eventId).Internal();
                     // server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
-                    SendMessage(pkg.GetPayload(), subscription->second.eventId);
+                    PostMessageEvent(pkg.GetPayload(), subscription->second.eventId);
                 }
                 Log->Append("END").Internal();
-                SendMessage(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
+                PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
             }
         }
         else
@@ -523,7 +520,7 @@ void SigmaWsServer::Connect()
 
         Log->Append("WebSocket server started on ws://").Append(WiFi.localIP().toString()).Append(config.rootPath).Append(":").Append(config.port).Internal();
         setReady(true);
-        SendMessage("CONNECTED", PROTOCOL_CONNECTED);
+        PostMessageEvent("CONNECTED", PROTOCOL_CONNECTED);
     }
     else
     {
@@ -536,7 +533,7 @@ void SigmaWsServer::Disconnect()
     httpd_stop(server);
     httpd_unregister_uri_handler(server, config.rootPath.c_str(), HTTP_GET);
     setReady(false);
-    SendMessage("DISCONNECTED", PROTOCOL_DISCONNECTED);
+    PostMessageEvent("DISCONNECTED", PROTOCOL_DISCONNECTED);
     if (shouldConnect)
     {
         Connect();
@@ -550,19 +547,6 @@ void SigmaWsServer::Close()
     Disconnect();
 }
 
-void SigmaWsServer::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    SigmaWsServer *ws = (SigmaWsServer *)arg;
-    if (event_id == PROTOCOL_STA_CONNECTED)
-    {
-        ws->Connect();
-    }
-    else if (event_id == PROTOCOL_STA_DISCONNECTED)
-    {
-        // ws->setReady(false);
-        ws->Disconnect();
-    }
-}
 
 bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 {
@@ -597,7 +581,7 @@ void SigmaWsServer::sendPing()
         if (it->second.pingRetryCount < 0)
         {
             Log->Append("Client " + it->second.clientId + " disconnected due to ping timeout").Error();
-            SendMessage("PING_TIMEOUT.  Client:" + it->second.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+            PostMessageEvent("PING_TIMEOUT.  Client:" + it->second.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
             clientsToRemove.push_back(it->first);
         }
     }
@@ -636,7 +620,7 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRe
         {
             Log->Append("[2]Client " + auth.clientId + " disconnected due to ping timeout").Error();
             removeClient(auth.socketNumber);
-            SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+            PostMessageEvent("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
         }
     }
     return res;
@@ -668,7 +652,7 @@ bool SigmaWsServer::sendPongToClient(ClientAuth &auth, String payload)
     {
         Log->Append("[3]Client " + auth.clientId + " disconnected due to ping timeout").Error();
         removeClient(auth.socketNumber);
-        SendMessage("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
+        PostMessageEvent("PING_TIMEOUT.  Client:" + auth.clientId + " disconnected.", PROTOCOL_PING_TIMEOUT);
     }
     return res;
 }
@@ -777,5 +761,5 @@ void SigmaWsServer::Subscribe(TopicSubscription subscriptionTopic)
 
     addSubscription(subscriptionTopic);
     Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
-    //esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
+    // esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
 }

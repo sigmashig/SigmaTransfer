@@ -22,7 +22,6 @@ public:
 private:
     SigmaLoger *Log;
     inline static WiFiConfig config;
-    wifi_mode_t mode;
     TimerHandle_t wifiStaReconnectTimer;
     bool isConnected = false;
 

@@ -24,14 +24,14 @@ SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
             Log->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
             isConnected = true;
             IPAddress ip = WiFi.localIP();
-            SigmaAsyncNetwork::PostEvent(PROTOCOL_STA_CONNECTED, &ip, sizeof(ip));
+            SigmaAsyncNetwork::PostEvent(NETWORK_STA_CONNECTED, &ip, sizeof(ip));
             break;
         }
         case SYSTEM_EVENT_STA_DISCONNECTED:
         {
             if (isConnected) {
                 Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
-                SigmaAsyncNetwork::PostEvent(PROTOCOL_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
+                SigmaAsyncNetwork::PostEvent(NETWORK_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
             }
             isConnected = false;
             if (this->config.shouldReconnect) {
@@ -67,7 +67,7 @@ void SigmaWiFi::Connect()
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
         reconnectWiFiSta(nullptr);
-        //WiFi.begin(config.wifiSta.ssid.c_str(), config.wifiSta.password.c_str());
+        // WiFi.begin(config.wifiSta.ssid.c_str(), config.wifiSta.password.c_str());
     }
     if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
     {
@@ -76,3 +76,14 @@ void SigmaWiFi::Connect()
     }
 }
 
+void SigmaWiFi::Disconnect()
+{
+    if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
+    {
+        WiFi.disconnect();
+    }
+    if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
+    {
+        WiFi.softAPdisconnect(true);
+    }
+}
