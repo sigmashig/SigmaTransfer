@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SigmaWsClient.h>
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 
 SigmaLoger *Log;
 
@@ -72,7 +72,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Network event").Internal();
-  SigmaAsyncNetwork *network = (SigmaAsyncNetwork *)arg;
+  SigmaNetworkMgr *network = (SigmaNetworkMgr *)arg;
   if (network == NULL)
   {
     Log->Append("Network is NULL").Internal();
@@ -104,15 +104,15 @@ void setup()
   networkConfig.ethernetConfig.gateway = IPAddress(192, 168, 0, 1);
   networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
   SigmaEthernet::GenerateMac(15, networkConfig.ethernetConfig.mac);
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log);
- /* espErr = esp_event_handler_instance_register_with(
-      SigmaAsyncNetwork::GetEventLoop(),
-      ESP_EVENT_ANY_BASE,
-      ESP_EVENT_ANY_ID,
-      networkEventHandler,
-      network,
-      NULL);*/
-  //espErr = SigmaAsyncNetwork::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, network);
+  SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
+  /* espErr = esp_event_handler_instance_register_with(
+       SigmaNetworkMgr::GetEventLoop(),
+       ESP_EVENT_ANY_BASE,
+       ESP_EVENT_ANY_ID,
+       networkEventHandler,
+       network,
+       NULL);*/
+  // espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, network);
   if (espErr != ESP_OK)
   {
     Log->Printf("Failed to register network event handler: %d", espErr).Internal();

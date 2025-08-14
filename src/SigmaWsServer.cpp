@@ -1,5 +1,5 @@
 #include "SigmaWsServer.h"
-#include "SigmaAsyncNetwork.h"
+#include "SigmaNetworkMgr.h"
 #include <freertos/queue.h>
 #include <sys/socket.h>
 #include <vector>
@@ -546,7 +546,6 @@ void SigmaWsServer::Close()
     shouldConnect = false;
     Disconnect();
 }
-
 
 bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 {

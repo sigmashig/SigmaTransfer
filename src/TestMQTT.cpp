@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SigmaMQTT.h>
 #include <SigmaWsClient.h>
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 #include <SigmaWsServer.h>
 
 #define PROTO_MQTT 1
@@ -161,7 +161,7 @@ void setup()
   networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
   SigmaNetwork::GenerateMac(networkConfig.ethernetConfig.mac, 15);
 
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log);
+  SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
   Log->Append("Creating MQTT").Internal();
   MqttConfig mqttConfig;
   mqttConfig.server = "192.168.0.102";

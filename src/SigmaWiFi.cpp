@@ -1,5 +1,5 @@
 #include "SigmaWiFi.h"
-#include "SigmaAsyncNetwork.h"
+#include "SigmaNetworkMgr.h"
 
 SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
 {
@@ -24,14 +24,14 @@ SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
             Log->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
             isConnected = true;
             IPAddress ip = WiFi.localIP();
-            SigmaAsyncNetwork::PostEvent(NETWORK_STA_CONNECTED, &ip, sizeof(ip));
+            SigmaNetworkMgr::PostEvent(NETWORK_STA_CONNECTED, &ip, sizeof(ip));
             break;
         }
         case SYSTEM_EVENT_STA_DISCONNECTED:
         {
             if (isConnected) {
                 Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
-                SigmaAsyncNetwork::PostEvent(NETWORK_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
+                SigmaNetworkMgr::PostEvent(NETWORK_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
             }
             isConnected = false;
             if (this->config.shouldReconnect) {

@@ -4,7 +4,7 @@
 #include <SigmaMQTT.h>
 #include <SigmaWSServer.h>
 #include <SigmaWSClient.h>
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 
 SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
@@ -25,7 +25,7 @@ SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoge
     {
         Log->Printf("Failed to create event loop: %d", espErr).Internal();
     }
-    espErr = SigmaAsyncNetwork::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
@@ -135,7 +135,7 @@ void SigmaConnection::clearPingTimer(SigmaConnection *conn)
 void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaConnection *conn = (SigmaConnection *)arg;
-    //conn->Log->Append("[networkEventHandler]event_id=").Append(event_id).Internal();
+    // conn->Log->Append("[networkEventHandler]event_id=").Append(event_id).Internal();
 
     switch (event_id)
     {
@@ -143,7 +143,7 @@ void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base
     {
         if (conn->networkMode == NETWORK_MODE_WAN)
         {
-            //conn->Log->Append("[networkEventHandler]WAN connected").Internal();
+            // conn->Log->Append("[networkEventHandler]WAN connected").Internal();
             conn->Connect();
         }
         break;
@@ -152,14 +152,14 @@ void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base
     {
         if (conn->networkMode == NETWORK_MODE_LAN)
         {
-            //conn->Log->Append("[networkEventHandler]LAN connected").Internal();
+            // conn->Log->Append("[networkEventHandler]LAN connected").Internal();
             conn->Connect();
         }
         break;
     }
     case NETWORK_WAN_DISCONNECTED:
     {
-        //conn->Log->Append("[networkEventHandler]WAN disconnected").Internal();
+        // conn->Log->Append("[networkEventHandler]WAN disconnected").Internal();
         conn->Disconnect();
         break;
     }

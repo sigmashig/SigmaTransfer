@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SigmaWsServer.h>
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 
 SigmaLoger *Log;
 
@@ -98,7 +98,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Network event").Internal();
-  SigmaAsyncNetwork *network = (SigmaAsyncNetwork *)arg;
+  SigmaNetworkMgr *network = (SigmaNetworkMgr *)arg;
   if (network == NULL)
   {
     Log->Append("Network is NULL").Internal();
@@ -154,9 +154,9 @@ void setup()
   networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
   networkConfig.wifiConfig.enabled = true;
   networkConfig.ethernetConfig.enabled = false;
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log);
+  SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
   espErr = esp_event_handler_instance_register_with(
-      SigmaAsyncNetwork::GetEventLoop(),
+      SigmaNetworkMgr::GetEventLoop(),
       ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       networkEventHandler,

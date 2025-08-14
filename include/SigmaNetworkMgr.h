@@ -1,5 +1,5 @@
-#ifndef SIGMAASYNCNETWORK_H
-#define SIGMAASYNCNETWORK_H
+#ifndef SIGMANETWORKMGR_H
+#define SIGMANETWORKMGR_H
 
 #pragma once
 #include "Arduino.h"
@@ -10,11 +10,11 @@
 #include "SigmaWiFi.h"
 #include "SigmaEthernet.h"
 
-class SigmaAsyncNetwork
+class SigmaNetworkMgr
 {
 public:
-    SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log = nullptr);
-    ~SigmaAsyncNetwork();
+    SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log = nullptr);
+    ~SigmaNetworkMgr();
     void Connect();
     void Disconnect();
     static bool IsConnected();
@@ -42,7 +42,7 @@ private:
 
     TimerHandle_t wifiStaReconnectTimer;
     inline static esp_event_loop_handle_t eventLoop;
-    inline static esp_event_base_t eventBase = "SigmaAsyncNetwork";
+    inline static esp_event_base_t eventBase = "SigmaNetworkMgr";
 };
 
 #endif

@@ -1,5 +1,5 @@
 #include "SigmaEthernet.h"
-#include "SigmaAsyncNetwork.h"
+#include "SigmaNetworkMgr.h"
 #include "SigmaSPI.h"
 
 extern "C"
@@ -50,7 +50,7 @@ void SigmaEthernet::handleEthEvent(int32_t id)
         isGotIp = false;
         isConnected = false;
         Log->Append("Ethernet Link Down").Internal();
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet Link is down", 0);
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet Link is down", 0);
         break;
     case ETHERNET_EVENT_START:
         Log->Append("Ethernet Started").Internal();
@@ -60,7 +60,7 @@ void SigmaEthernet::handleEthEvent(int32_t id)
         isLinkUp = false;
         isGotIp = false;
         isConnected = false;
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet stopped", 0);
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet stopped", 0);
         break;
     default:
         break;
@@ -73,7 +73,7 @@ void SigmaEthernet::handleIpGot()
     isConnected = true;
     IPAddress ip = GetIpAddress();
     Log->Append("Ethernet connected. IP address:").Append(ip.toString()).Info();
-    SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_CONNECTED, &ip, sizeof(ip));
+    SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_CONNECTED, &ip, sizeof(ip));
 }
 
 void SigmaEthernet::onEthEvent(void *arg, esp_event_base_t, int32_t id, void *)
@@ -118,7 +118,7 @@ bool SigmaEthernet::initBoard(spi_device_handle_t spiHandle)
             Log->Append("[Error] esp_eth_driver_install failed").Error();
             return false;
         }
-        //Log->Append("W5500 initialized").Internal();
+        // Log->Append("W5500 initialized").Internal();
     }
     return true;
 }
@@ -129,7 +129,7 @@ bool SigmaEthernet::Connect()
 
     resetBoard();
     // Init netif and default loop once per app
-    //Log->Append("Initializing netif and default loop").Internal();
+    // Log->Append("Initializing netif and default loop").Internal();
     if (!isNetifInited)
     {
         err = esp_netif_init();
@@ -147,7 +147,7 @@ bool SigmaEthernet::Connect()
         isNetifInited = true;
     }
 
-    //Log->Append("Creating netif").Internal();
+    // Log->Append("Creating netif").Internal();
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
     netifHandle = esp_netif_new(&netif_cfg);
     if (!netifHandle)
@@ -155,7 +155,7 @@ bool SigmaEthernet::Connect()
         Log->Append("[Error] esp_netif_new failed").Error();
         return false;
     }
-    //Log->Append("netif created").Internal();
+    // Log->Append("netif created").Internal();
 
     //--------------------------------
 
@@ -169,14 +169,14 @@ bool SigmaEthernet::Connect()
         Log->Append("[Error] SPI initialization failed").Error();
         return false;
     }
-    //Log->Append("SPI initialized").Internal();
+    // Log->Append("SPI initialized").Internal();
     err = gpio_install_isr_service(SigmaEthernet::GPIO_ISR_FLAGS);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
     {
         Log->Append("[Error] gpio_install_isr_service failed").Error();
         return false;
     }
-    //Log->Append("GPIO ISR service installed").Internal();
+    // Log->Append("GPIO ISR service installed").Internal();
 
     if (!initBoard(spiHandle))
     {
@@ -184,8 +184,8 @@ bool SigmaEthernet::Connect()
         return false;
     }
 
-    //Log->Append("Setting MAC").Internal();
-    // Set MAC
+    // Log->Append("Setting MAC").Internal();
+    //  Set MAC
     err = esp_eth_ioctl(ethHandle, ETH_CMD_S_MAC_ADDR, config.mac);
     if (err != ESP_OK)
     {

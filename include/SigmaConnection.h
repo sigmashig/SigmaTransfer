@@ -6,7 +6,7 @@
 #include <map>
 #include <list>
 #include <esp_event.h>
-// #include <SigmaAsyncNetwork.h>
+// #include <SigmaNetworkMgr.h>
 #include "SigmaTransferDefs.h"
 
 typedef struct

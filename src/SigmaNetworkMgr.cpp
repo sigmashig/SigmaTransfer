@@ -1,10 +1,10 @@
-#include "SigmaAsyncNetwork.h"
+#include "SigmaNetworkMgr.h"
 #include <esp_netif.h>
 #include <esp_event.h>
 // #include "WiFi.h"
 #include "SigmaWiFi.h"
 
-SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
+SigmaNetworkMgr::SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log)
 {
     Log = log != nullptr ? log : new SigmaLoger(0);
     this->config = config;
@@ -29,7 +29,7 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
         
         esp_event_loop_args_t loop_args = {
             .queue_size = 100,
-            .task_name = "SigmaAsyncNetwork_event_loop",
+            .task_name = "SigmaNetworkMgr_event_loop",
             .task_priority = 100, // high priority
             .task_stack_size = 4096,
             .task_core_id = 0};
@@ -62,11 +62,11 @@ SigmaAsyncNetwork::SigmaAsyncNetwork(NetworkConfig config, SigmaLoger *log)
     }
 }
 
-SigmaAsyncNetwork::~SigmaAsyncNetwork()
+SigmaNetworkMgr::~SigmaNetworkMgr()
 {
 }
 
-void SigmaAsyncNetwork::Connect()
+void SigmaNetworkMgr::Connect()
 {
     if (ethernet != nullptr)
     {
@@ -78,7 +78,7 @@ void SigmaAsyncNetwork::Connect()
     }
 }
 
-void SigmaAsyncNetwork::Disconnect()
+void SigmaNetworkMgr::Disconnect()
 {
     if (wifi != nullptr)
     {
@@ -90,7 +90,7 @@ void SigmaAsyncNetwork::Disconnect()
     }
 }
 
-bool SigmaAsyncNetwork::IsConnected()
+bool SigmaNetworkMgr::IsConnected()
 {
     bool isConnected = false;
     if (wifi != nullptr)
@@ -104,7 +104,7 @@ bool SigmaAsyncNetwork::IsConnected()
     return isConnected;
 }
 
-esp_err_t SigmaAsyncNetwork::PostEvent(int32_t eventId, void *eventData, size_t eventDataSize)
+esp_err_t SigmaNetworkMgr::PostEvent(int32_t eventId, void *eventData, size_t eventDataSize)
 {
     // The events STA/AP/ETHERNET are used for internal purposes. Only LAN/WAN are used for external purposes.
     esp_err_t espErr1 = ESP_OK;
@@ -168,7 +168,7 @@ esp_err_t SigmaAsyncNetwork::PostEvent(int32_t eventId, void *eventData, size_t 
     return espErr1 != ESP_OK || espErr2 != ESP_OK ? ESP_FAIL : ESP_OK;
 }
 
-esp_err_t SigmaAsyncNetwork::RegisterEventHandlers(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg)
+esp_err_t SigmaNetworkMgr::RegisterEventHandlers(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg)
 {
     return esp_event_handler_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg);
 }

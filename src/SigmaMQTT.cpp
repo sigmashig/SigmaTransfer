@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #include <string.h>
 #include <SigmaLoger.h>
-#include "SigmaAsyncNetwork.h"
+#include "SigmaNetworkMgr.h"
 
 ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
@@ -13,7 +13,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
     this->config = config;
     pingInterval = 0; // MQTT doesn't support ping at this moment
     mqttClient = NULL;
-    if ((config.networkMode == NETWORK_MODE_LAN && SigmaAsyncNetwork::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaAsyncNetwork::IsWanConnected()))
+    if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
     {
         // init();
         Connect();
@@ -134,16 +134,16 @@ void SigmaMQTT::Connect()
     bool canConnect = true;
     if (config.networkMode == NETWORK_MODE_LAN)
     {
-        canConnect = SigmaAsyncNetwork::IsLanConnected();
+        canConnect = SigmaNetworkMgr::IsLanConnected();
     }
     else if (config.networkMode == NETWORK_MODE_WAN)
     {
-        canConnect = SigmaAsyncNetwork::IsWanConnected();
+        canConnect = SigmaNetworkMgr::IsWanConnected();
     }
     else
     {
         // NONE or unspecified: require at least one network
-        canConnect = SigmaAsyncNetwork::IsConnected();
+        canConnect = SigmaNetworkMgr::IsConnected();
     }
     if (!canConnect)
     {

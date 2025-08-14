@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SigmaMQTT.h>
 #include <SigmaWsClient.h>
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 #include <SigmaWsServer.h>
 
 #define PROTO_MQTT 1
@@ -33,7 +33,6 @@ void TestSuite2()
       break;
     }
   }
-
 }
 
 void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -70,7 +69,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
   {
     char *msg = (char *)event_data;
     Log->Append("PROTOCOL_CONNECTED:").Append(msg).Append("#").Internal();
-  //  TestSuite2();
+    //  TestSuite2();
   }
   else if (event_id == PROTOCOL_AP_CONNECTED)
   {
@@ -102,7 +101,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
   }
   else if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
   {
-    //Log->Append("PROTOCOL_SEND_SIGMA_MESSAGE").Internal();
+    // Log->Append("PROTOCOL_SEND_SIGMA_MESSAGE").Internal();
   }
   else
   {
@@ -114,7 +113,7 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   Log->Append("Network event").Internal();
-  SigmaAsyncNetwork *network = (SigmaAsyncNetwork *)arg;
+  SigmaNetworkMgr *network = (SigmaNetworkMgr *)arg;
   if (network == NULL)
   {
     Log->Append("Network is NULL").Internal();
@@ -170,9 +169,9 @@ void setup()
   networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
   networkConfig.wifiConfig.enabled = true;
   networkConfig.ethernetConfig.enabled = false;
-  SigmaAsyncNetwork *network = new SigmaAsyncNetwork(networkConfig, Log);
+  SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
   espErr = esp_event_handler_instance_register_with(
-      SigmaAsyncNetwork::GetEventLoop(),
+      SigmaNetworkMgr::GetEventLoop(),
       ESP_EVENT_ANY_BASE,
       ESP_EVENT_ANY_ID,
       networkEventHandler,

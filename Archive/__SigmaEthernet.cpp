@@ -1,5 +1,5 @@
 #include "SigmaEthernet.h"
-#include <SigmaAsyncNetwork.h>
+#include <SigmaNetworkMgr.h>
 
 SigmaEthernet::SigmaEthernet(EthernetConfig config, SigmaLoger *log)
 {
@@ -52,7 +52,7 @@ SigmaEthernet::SigmaEthernet(EthernetConfig config, SigmaLoger *log)
         //Log->Append("Ethernet connected: ").Append(Ethernet.localIP().toString()).Internal();
         String msg = "Ethernet connected: " + Ethernet.localIP().toString();
         Log->Append(msg).Internal();
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_CONNECTED, (void *)msg.c_str(), msg.length() + 1);
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_CONNECTED, (void *)msg.c_str(), msg.length() + 1);
     }
     else
     {
@@ -92,7 +92,7 @@ void SigmaEthernet::Connect()
         // Log->Append("Ethernet connected: ").Append(Ethernet.localIP().toString()).Internal();
         String msg = "Ethernet connected: " + Ethernet.localIP().toString();
         Log->Append(msg).Internal();
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_CONNECTED, (void *)msg.c_str(), msg.length() + 1);
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_CONNECTED, (void *)msg.c_str(), msg.length() + 1);
     }
     else
     {
@@ -104,7 +104,7 @@ void SigmaEthernet::Connect()
 void SigmaEthernet::Disconnect()
 {
     isConnected = false;
-    SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, NULL, 0);
+    SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, NULL, 0);
 }
 
 byte *SigmaEthernet::GenerateMac(byte id, byte mac[6])
