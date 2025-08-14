@@ -9,17 +9,9 @@ SigmaNetworkMgr::SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log)
     Log = log != nullptr ? log : new SigmaLoger(0);
     this->config = config;
     esp_err_t espErr = ESP_OK;
+    Log->Append("SigmaNetworkMgr init").Internal();
     if (config.enabled)
     {
-        // Ensure default event loop and lwIP/tcpip thread (esp_netif) are initialized once.
-        // These return ESP_ERR_INVALID_STATE if already initialized; ignore that.
-        /*
-        esp_err_t espErr = esp_event_loop_create_default();
-        if (espErr != ESP_OK && espErr != ESP_ERR_INVALID_STATE)
-        {
-            Log->Printf("Failed to create default event loop: %d", espErr).Internal();
-        }
-            */
             
         espErr = esp_netif_init();
         if (espErr != ESP_OK && espErr != ESP_ERR_INVALID_STATE)
@@ -40,7 +32,7 @@ SigmaNetworkMgr::SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log)
             Log->Printf("Failed to create event loop: %d", espErr).Internal();
             // exit(1);
         }
-        // espErr = esp_netif_create_default_ethernet();
+        Log->Append("Event loop created").Internal();
         if (config.ethernetConfig.enabled)
         {
             ethernet = new SigmaEthernet(config.ethernetConfig, Log);
@@ -170,5 +162,6 @@ esp_err_t SigmaNetworkMgr::PostEvent(int32_t eventId, void *eventData, size_t ev
 
 esp_err_t SigmaNetworkMgr::RegisterEventHandlers(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg)
 {
+    Serial.printf("loop: %p, event_id: %d, event_handler: %p, event_handler_arg: %p\n", eventLoop, event_id, event_handler, event_handler_arg);
     return esp_event_handler_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg);
 }

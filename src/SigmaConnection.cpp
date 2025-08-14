@@ -25,11 +25,13 @@ SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoge
     {
         Log->Printf("Failed to create event loop: %d", espErr).Internal();
     }
+    Log->Append("Registering network event handler").Internal();
     espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
     }
+    Log->Append("Network event handler registered").Internal();
 }
 void SigmaConnection::PostMessageEvent(String message, int eventId)
 {
@@ -177,12 +179,15 @@ SigmaConnection *SigmaConnection::Create(SigmaProtocolType type, SigmaConnection
     switch (type)
     {
     case SIGMA_PROTOCOL_MQTT:
+        logger->Append("Creating SigmaMQTT").Internal();
         return new SigmaMQTT(config.mqttConfig, logger, priority);
         break;
     case SIGMA_PROTOCOL_WS_SERVER:
+        logger->Append("Creating SigmaWsServer").Internal();
         return new SigmaWsServer(config.wsServerConfig, logger, priority);
         break;
     case SIGMA_PROTOCOL_WS_CLIENT:
+        logger->Append("Creating SigmaWsClient").Internal();
         return new SigmaWsClient(config.wsClientConfig, logger, priority);
         break;
     default:

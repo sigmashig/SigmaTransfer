@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <SigmaTransferDefs.h>
 #include "SigmaLoger.h"
 
 class SigmaNetwork
@@ -21,6 +22,8 @@ public:
     virtual bool IsGotIp() const { return isGotIp; }
     virtual bool IsLinkUp() const { return isLinkUp; }
     static String MACToString(const byte mac[6]);
+    static void StringToMAC(String macString, byte mac[6]);
+    static EthernetHardwareType EthernetHardwareTypeFromString(String hardwareType);
 
 protected:
     bool isConnected = false;

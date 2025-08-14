@@ -11,8 +11,8 @@ extern "C"
 class SigmaSPI
 {
 public:
-
     static esp_err_t Initialize(SPIConfig &spiConfig, spi_device_handle_t *out_device);
+    static spi_host_device_t SpiHostFromName(String name);
 
 private:
     inline static bool spiBusInited[3] = {false, false, false};

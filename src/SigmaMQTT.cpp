@@ -13,6 +13,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
     this->config = config;
     pingInterval = 0; // MQTT doesn't support ping at this moment
     mqttClient = NULL;
+    Log->Append("SigmaMQTT init. Network mode:").Append(config.networkMode).Internal();
     if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
     {
         // init();

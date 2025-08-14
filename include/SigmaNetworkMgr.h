@@ -41,7 +41,7 @@ private:
     wifi_mode_t mode = WIFI_MODE_STA;
 
     TimerHandle_t wifiStaReconnectTimer;
-    inline static esp_event_loop_handle_t eventLoop;
+    inline static esp_event_loop_handle_t eventLoop = nullptr;
     inline static esp_event_base_t eventBase = "SigmaNetworkMgr";
 };
 

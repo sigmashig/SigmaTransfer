@@ -72,3 +72,20 @@ esp_err_t SigmaSPI::Initialize(SPIConfig &spiConfig, spi_device_handle_t *outDev
     }
     return ESP_OK;
 }
+
+spi_host_device_t SigmaSPI::SpiHostFromName(String name)
+{
+    if (name == "SPI3_HOST")
+    {
+        return SPI3_HOST;
+    }
+    else if (name == "SPI2_HOST")
+    {
+        return SPI2_HOST;
+    }
+    else if (name == "SPI1_HOST")
+    {
+        return SPI1_HOST;
+    }
+    return SPI3_HOST;
+}
