@@ -65,12 +65,10 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         this->isError = true;
         return;
     }
-    Serial.printf("SigmaInternalPkg:msg=%s\n", msg);
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, msg);
     if (error)
     {
-        Serial.printf("Error deserializing JSON: %s\n", error.c_str());
         this->isError = true;
         return;
     }
@@ -111,7 +109,6 @@ SigmaInternalPkg::SigmaInternalPkg(const char *msg)
         this->isAllocated = false;
         binaryPayload = nullptr;
     }
-    // Serial.printf("payload: %s\n", doc["payload"].as<String>().c_str());
     init(pkg0.topic, pkg0.payload, pkg0.qos, pkg0.retained, pkg0.isBinary, pkg0.clientId, pkg0.binaryPayload, pkg0.binaryPayloadLength);
 }
 
@@ -129,17 +126,14 @@ bool SigmaInternalPkg::IsSigmaInternalPkg(const String &json)
     DeserializationError error = deserializeJson(doc, json);
     if (error)
     {
-        Serial.printf("[check]Error deserializing JSON: %s\n", error.c_str());
         return false;
     }
     if (!doc["topic"].is<String>())
     {
-        //    Serial.println("topic not found");
         return false;
     }
     if (!doc["payload"].is<String>())
     {
-        //    Serial.println("payload not found");
         return false;
     }
 

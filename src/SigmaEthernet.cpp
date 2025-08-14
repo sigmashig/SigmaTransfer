@@ -19,13 +19,11 @@ SigmaEthernet::~SigmaEthernet()
 
 bool SigmaEthernet::GetIpInfo(esp_netif_ip_info_t *out) const
 {
-    Serial.println("GetIpInfo");
     if (!netifHandle)
     {
-        Serial.println("GetIpInfo: netifHandle is null");
+        Log->Append("GetIpInfo: netifHandle is null").Error();
         return false;
     }
-    // Serial.println("GetIpInfo: esp_netif_get_ip_info");
     return esp_netif_get_ip_info(netifHandle, out) == ESP_OK;
 }
 
@@ -45,24 +43,24 @@ void SigmaEthernet::handleEthEvent(int32_t id)
     {
     case ETHERNET_EVENT_CONNECTED:
         isLinkUp = true;
-        Serial.println("Link Up");
+        Log->Append("Ethernet Link Up").Internal();
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         isLinkUp = false;
         isGotIp = false;
         isConnected = false;
-        Serial.println("Link Down");
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Link is down", 0);
+        Log->Append("Ethernet Link Down").Internal();
+        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet Link is down", 0);
         break;
     case ETHERNET_EVENT_START:
-        Serial.println("Started");
+        Log->Append("Ethernet Started").Internal();
         break;
     case ETHERNET_EVENT_STOP:
-        Serial.println("Stopped");
+        Log->Append("Ethernet Stopped").Internal();
         isLinkUp = false;
         isGotIp = false;
         isConnected = false;
-        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Board stopped", 0);
+        SigmaAsyncNetwork::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet stopped", 0);
         break;
     default:
         break;
@@ -102,7 +100,7 @@ bool SigmaEthernet::initBoard(spi_device_handle_t spiHandle)
     esp_err_t err = ESP_OK;
     if (EthernetHardwareType::ETHERNET_HARDWARE_TYPE_W5500 == config.hardwareType)
     {
-        Serial.println("Initializing W5500");
+        // Log->Append("Initializing W5500").Internal();
         eth_w5500_config_t w5500Config = ETH_W5500_DEFAULT_CONFIG(spiHandle);
         w5500Config.int_gpio_num = config.hardware.w5500.intPin;
 
@@ -117,10 +115,10 @@ bool SigmaEthernet::initBoard(spi_device_handle_t spiHandle)
         err = esp_eth_driver_install(&eth_config, &ethHandle);
         if (err != ESP_OK)
         {
-            Serial.println("esp_eth_driver_install failed");
+            Log->Append("[Error] esp_eth_driver_install failed").Error();
             return false;
         }
-        Serial.println("W5500 initialized");
+        //Log->Append("W5500 initialized").Internal();
     }
     return true;
 }
@@ -131,33 +129,33 @@ bool SigmaEthernet::Connect()
 
     resetBoard();
     // Init netif and default loop once per app
-    Serial.println("Initializing netif and default loop");
+    //Log->Append("Initializing netif and default loop").Internal();
     if (!isNetifInited)
     {
         err = esp_netif_init();
         if (err != ESP_OK)
         {
-            Serial.println("esp_netif_init failed");
+            Log->Append("[Error] esp_netif_init failed").Error();
             return false;
         }
         err = esp_event_loop_create_default();
         if (err != ESP_OK)
         {
-            Serial.println("esp_event_loop_create_default failed");
+            Log->Append("[Error] esp_event_loop_create_default failed").Error();
             return false;
         }
         isNetifInited = true;
     }
 
-    Serial.println("Creating netif");
+    //Log->Append("Creating netif").Internal();
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
     netifHandle = esp_netif_new(&netif_cfg);
     if (!netifHandle)
     {
-        Serial.println("esp_netif_new failed");
+        Log->Append("[Error] esp_netif_new failed").Error();
         return false;
     }
-    Serial.println("netif created");
+    //Log->Append("netif created").Internal();
 
     //--------------------------------
 
@@ -168,31 +166,30 @@ bool SigmaEthernet::Connect()
     err = SigmaSPI::Initialize(config.hardware.w5500.spiConfig, &spiHandle);
     if (err != ESP_OK)
     {
-        Serial.println("SPI initialization failed");
+        Log->Append("[Error] SPI initialization failed").Error();
         return false;
     }
-    Serial.println("SPI initialized");
-    Serial.println("Installing GPIO ISR service");
+    //Log->Append("SPI initialized").Internal();
     err = gpio_install_isr_service(SigmaEthernet::GPIO_ISR_FLAGS);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
     {
-        Serial.println("gpio_install_isr_service failed");
+        Log->Append("[Error] gpio_install_isr_service failed").Error();
         return false;
     }
-    Serial.println("GPIO ISR service installed");
+    //Log->Append("GPIO ISR service installed").Internal();
 
     if (!initBoard(spiHandle))
     {
-        Serial.println("initBoard failed");
+        Log->Append("[Error] initBoard failed").Error();
         return false;
     }
 
-    Serial.println("Setting MAC");
+    //Log->Append("Setting MAC").Internal();
     // Set MAC
     err = esp_eth_ioctl(ethHandle, ETH_CMD_S_MAC_ADDR, config.mac);
     if (err != ESP_OK)
     {
-        Serial.println("esp_eth_ioctl failed");
+        Log->Append("[Error] esp_eth_ioctl failed").Error();
         return false;
     }
 
@@ -201,45 +198,37 @@ bool SigmaEthernet::Connect()
     err = esp_netif_attach(netifHandle, glue);
     if (err != ESP_OK)
     {
-        Serial.println("esp_netif_attach failed");
+        Log->Append("[Error] esp_netif_attach failed").Error();
         return false;
     }
-    Serial.println("MAC set");
-
-    Serial.println("Registering events");
     // Register events
     err = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &SigmaEthernet::onEthEvent, this);
     if (err != ESP_OK)
     {
-        Serial.println("esp_event_handler_register failed");
+        Log->Append("[Error] esp_event_handler_register failed").Error();
         return false;
     }
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &SigmaEthernet::onIpEvent, this);
     if (err != ESP_OK)
     {
-        Serial.println("esp_event_handler_register failed");
+        Log->Append("[Error] esp_event_handler_register failed").Error();
         return false;
     }
-    Serial.println("Events registered");
-
-    Serial.println("Starting DHCP");
     // DHCP or static IP
     if (config.dhcp)
     {
         err = esp_netif_dhcpc_start(netifHandle);
         if (err != ESP_OK)
         {
-            Serial.println("esp_netif_dhcpc_start failed");
+            Log->Append("[Error] esp_netif_dhcpc_start failed").Error();
         }
-        Serial.println("DHCP started");
     }
     if (!config.dhcp || err != ESP_OK)
     { // static IP
-        Serial.println("Setting static IP");
         err = esp_netif_dhcpc_stop(netifHandle);
         if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
         {
-            Serial.println("esp_netif_dhcpc_stop failed");
+            Log->Append("[Error] esp_netif_dhcpc_stop failed").Error();
         }
         esp_netif_ip_info_t ip_info = {};
         char buf[16];
@@ -247,19 +236,19 @@ bool SigmaEthernet::Connect()
         err = esp_netif_str_to_ip4(buf, &ip_info.ip);
         if (err != ESP_OK)
         {
-            Serial.printf("IP Address is wrong:%s\n", buf);
+            Log->Append("[Error] IP Address is wrong:").Append(buf).Error();
         }
         snprintf(buf, sizeof(buf), "%u.%u.%u.%u", config.gateway[0], config.gateway[1], config.gateway[2], config.gateway[3]);
         err = esp_netif_str_to_ip4(buf, &ip_info.gw);
         if (err != ESP_OK)
         {
-            Serial.printf("Gateway Address is wrong:%s\n", buf);
+            Log->Append("[Error] Gateway Address is wrong:").Append(buf).Error();
         }
         snprintf(buf, sizeof(buf), "%u.%u.%u.%u", config.subnet[0], config.subnet[1], config.subnet[2], config.subnet[3]);
         err = esp_netif_str_to_ip4(buf, &ip_info.netmask);
         if (err != ESP_OK)
         {
-            Serial.printf("Subnet Address is wrong:%s\n", buf);
+            Log->Append("[Error] Subnet Address is wrong:").Append(buf).Error();
         }
         err = esp_netif_set_ip_info(netifHandle, &ip_info);
 
@@ -268,25 +257,22 @@ bool SigmaEthernet::Connect()
         err = esp_netif_str_to_ip4(buf, &dns_info.ip.u_addr.ip4);
         if (err != ESP_OK)
         {
-            Serial.printf("DNS Address is wrong:%s\n", buf);
+            Log->Append("[Error] DNS Address is wrong:").Append(buf).Error();
         }
         dns_info.ip.type = ESP_IPADDR_TYPE_V4;
         err = esp_netif_set_dns_info(netifHandle, ESP_NETIF_DNS_MAIN, &dns_info);
         if (err != ESP_OK)
         {
-            Serial.println("esp_netif_set_dns_info failed");
+            Log->Append("[Error] esp_netif_set_dns_info failed").Error();
         }
-        Serial.println("Static IP set");
     }
-    Serial.println("DHCP started");
-    Serial.println("Starting Ethernet");
     err = esp_eth_start(ethHandle);
     if (err != ESP_OK)
     {
-        Serial.println("esp_eth_start failed");
+        Log->Append("[Error] esp_eth_start failed").Error();
         return false;
     }
-    Serial.println("Ethernet started");
+    Log->Append("Ethernet started").Internal();
 
     return true;
 }

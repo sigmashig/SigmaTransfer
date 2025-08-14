@@ -113,29 +113,18 @@ esp_err_t SigmaAsyncNetwork::PostEvent(int32_t eventId, void *eventData, size_t 
     {
         numberOfWanConnections++;
         numberOfLanConnections++;
-        /*
-        Serial.printf("NETWORK_STA_CONNECTED or NETWORK_ETHERNET_CONNECTED: numberOfWanConnections=%d, numberOfLanConnections=%d\n", numberOfWanConnections, numberOfLanConnections);
-        Serial.printf("eventData: %s\n", (char *)eventData);
-        Serial.printf("eventDataSize: %d\n", eventDataSize);
-        Serial.printf("eventId: %d\n", eventId);
-        Serial.printf("eventLoop: %p\n", eventLoop);
-        Serial.printf("eventBase: %p\n", eventBase);
-        */
         if (numberOfWanConnections == 1)
         {
             espErr1 = esp_event_post_to(eventLoop, eventBase, NETWORK_WAN_CONNECTED, eventData, eventDataSize, portMAX_DELAY);
-            Serial.printf("NETWORK_WAN_CONNECTED: espErr1=%d\n", espErr1);
         }
         if (numberOfLanConnections == 1)
         {
             espErr2 = esp_event_post_to(eventLoop, eventBase, NETWORK_LAN_CONNECTED, eventData, eventDataSize, portMAX_DELAY);
-            Serial.printf("NETWORK_LAN_CONNECTED: espErr2=%d\n", espErr2);
         }
     }
     else if (eventId == NETWORK_STA_DISCONNECTED || eventId == NETWORK_ETHERNET_DISCONNECTED)
     {
-        Serial.printf("NETWORK_STA_DISCONNECTED or NETWORK_ETHERNET_DISCONNECTED: numberOfWanConnections=%d, numberOfLanConnections=%d\n", numberOfWanConnections, numberOfLanConnections);
-        if (numberOfWanConnections > 0)
+         if (numberOfWanConnections > 0)
         {
             numberOfWanConnections--;
         }
@@ -173,7 +162,6 @@ esp_err_t SigmaAsyncNetwork::PostEvent(int32_t eventId, void *eventData, size_t 
     }
     else
     {
-        Serial.printf("PostEvent: eventId=%d\n", eventId);
         espErr1 = esp_event_post_to(eventLoop, eventBase, eventId, eventData, eventDataSize, portMAX_DELAY);
     }
 
