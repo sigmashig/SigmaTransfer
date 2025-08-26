@@ -341,7 +341,7 @@ void SigmaWsServer::processData(void *arg)
 void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t socketNumber, httpd_req_t *req)
 {
     String payloadStr = String((char *)payload, len);
-    Log->Printf("handleTextPackage:payloadStr=%s\n", payloadStr.c_str()).Internal();
+    // Log->Printf("handleTextPackage:payloadStr=%s\n", payloadStr.c_str()).Internal();
     if (clients.find(socketNumber) == clients.end())
     {
         Log->Printf("Client %d not found\n", socketNumber).Error();
@@ -368,13 +368,13 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
         uPayload.toUpperCase();
         if (uPayload.startsWith("PING"))
         {
-            Log->Printf("PING command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
+            // Log->Printf("PING command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
             sendPongToClient(clients[socketNumber], String((char *)payload + strlen("PING"), len - strlen("PING")));
         }
         else if (uPayload.startsWith("PONG"))
         {
-            Log->Printf("PONG command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
-            // TODO: processing of pong package
+            // Log->Printf("PONG command received from client %s\n", clients[socketNumber].clientId.c_str()).Internal();
+            //  TODO: processing of pong package
         }
         else if (uPayload.startsWith("CLOSE"))
         {
@@ -384,7 +384,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
         else if (SigmaInternalPkg::IsSigmaInternalPkg(payloadStr))
         {
             SigmaInternalPkg pkg(payloadStr);
-            //Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
+            // Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
             if (pkg.IsError())
             {
                 Log->Printf("Error in package: %s\n", pkg.GetPkgString().c_str()).Error();
@@ -403,7 +403,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
                     // server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
                     PostMessageEvent(pkg.GetPayload(), subscription->second.eventId);
                 }
-                Log->Append("END").Internal();
+                //Log->Append("END").Internal();
                 PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
             }
         }
@@ -453,9 +453,11 @@ bool SigmaWsServer::clientAuthRequest(httpd_req_t *req, String &request, ClientA
     {
         auth->pingType = PING_NO;
     }
+    /*
     Log->Append("Client ID:").Append(cId).Internal();
     Log->Append("Auth Key:").Append(authKey).Internal();
     Log->Append("Ping Type:").Append(auth->pingType).Internal();
+    */
     if (isClientAvailable(cId, authKey))
     {
         if (req != NULL)
@@ -562,7 +564,7 @@ bool SigmaWsServer::isClientAvailable(String clientId, String authKey)
 
 void SigmaWsServer::sendPing()
 {
-    Log->Printf("PingTask(%d)", clients.size()).Internal();
+    // Log->Printf("PingTask(%d)", clients.size()).Internal();
     std::vector<int32_t> clientsToRemove;
     clientsToRemove.clear();
     for (auto it = clients.begin(); it != clients.end(); it++)
@@ -575,7 +577,7 @@ void SigmaWsServer::sendPing()
         }
         else
         {
-            Log->Append("Ping sent to client:").Append(it->second.clientId).Internal();
+            // Log->Append("Ping sent to client:").Append(it->second.clientId).Internal();
         }
         it->second.pingRetryCount--;
         if (it->second.pingRetryCount < 0)
@@ -595,7 +597,7 @@ bool SigmaWsServer::sendPingToClient(ClientAuth &auth, String payload, bool isRe
 {
     bool res = false;
     PingType pingType = auth.pingType;
-    Log->Append("sendPingToClient:pingType:").Append(pingType).Internal();
+    //Log->Append("sendPingToClient:pingType:").Append(pingType).Internal();
     if (pingType == PING_NO)
     {
         res = true;

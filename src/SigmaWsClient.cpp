@@ -160,7 +160,7 @@ void SigmaWsClient::wsEventHandler(void *handler_args, esp_event_base_t base, in
     }
     case WEBSOCKET_EVENT_DATA:
     {
-        ws->Log->Append("[wsEventHandler] WebSocket Data Received").Internal();
+        //ws->Log->Append("[wsEventHandler] WebSocket Data Received").Internal();
         ws->onData(*data, ws);
         break;
     }
@@ -313,7 +313,7 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     UpperPayload.toUpperCase();
     if (UpperPayload.startsWith("PING"))
     {
-        ws->Log->Append("Received PING frame").Internal();
+        //ws->Log->Append("Received PING frame").Internal();
         esp_websocket_client_send_text(ws->wsClient, "PONG", 4, portMAX_DELAY);
         ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_PING);
     }
@@ -328,7 +328,7 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     }
     else if (SigmaInternalPkg::IsSigmaInternalPkg(payload))
     {
-        ws->Log->Append("Received SigmaInternalPkg").Internal();
+        //ws->Log->Append("Received SigmaInternalPkg").Internal();
         SigmaInternalPkg pkg(payload);
         ws->PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
         TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
@@ -346,8 +346,6 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
 void SigmaWsClient::onDataBinary(byte *payload, size_t payloadLen, SigmaWsClient *ws)
 {
     ws->Log->Append("Received Binary Data").Internal();
-    // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE,
-    //                   (void *)(payload), payloadLen, portMAX_DELAY);
     ws->PostMessageEvent(String((char *)payload, payloadLen), PROTOCOL_RECEIVED_RAW_BINARY_MESSAGE);
 }
 

@@ -35,16 +35,20 @@ public:
 
 private:
     WSClientConfig config;
-    //bool isReady = false;
-    // inline static AsyncClient wsClient;
+    // static constexpr int DEFAULT_WS_PORT = 80;
+    // static constexpr int DEFAULT_WSS_PORT = 443;
+
+    // bool isReady = false;
+    //  inline static AsyncClient wsClient;
     bool shouldConnect = true;
     int pingRetryCount = 0;
 
     esp_websocket_client_handle_t wsClient = NULL;
     esp_websocket_client_config_t wsClientConfig;
+    String headersStorage; // holds persistent HTTP headers buffer
+    // String resolvedUri;    // full ws/wss URI constructed at connect time
 
-    void
-        Connect();
+    void Connect();
     void Disconnect();
     void sendPing();
     void Close()
@@ -60,8 +64,6 @@ private:
     void onDataBinary(byte *payload, size_t payloadLen, SigmaWsClient *ws);
     void onData(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
     void onError(esp_websocket_event_data_t &arg, SigmaWsClient *ws);
-    // static void onTimeout(void *arg, AsyncClient *c, uint32_t time);
-    //bool sendWebSocketFrame(const byte *payload, size_t payloadLen, byte opcode, bool isAuth = false);
     void setReady(bool ready);
     static void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void wsEventHandler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);

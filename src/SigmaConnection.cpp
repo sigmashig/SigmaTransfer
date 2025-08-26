@@ -103,7 +103,6 @@ void SigmaConnection::clearReconnectTimer(SigmaConnection *conn)
 
 void SigmaConnection::setPingTimer(SigmaConnection *conn)
 {
-    //conn->Log->Append("[setPingTimer]").Internal();
     if (conn->pingInterval > 0)
     {
         if (conn->pingTimer == nullptr)
