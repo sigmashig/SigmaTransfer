@@ -363,6 +363,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
                 removeClient(socketNumber);
             }
         }
+        clients[socketNumber].pingRetryCount = config.pingRetryCount;
         String uPayload = payloadStr;
         uPayload.toUpperCase();
         if (uPayload.startsWith("PING"))
@@ -383,7 +384,7 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
         else if (SigmaInternalPkg::IsSigmaInternalPkg(payloadStr))
         {
             SigmaInternalPkg pkg(payloadStr);
-            Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
+            //Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
             if (pkg.IsError())
             {
                 Log->Printf("Error in package: %s\n", pkg.GetPkgString().c_str()).Error();

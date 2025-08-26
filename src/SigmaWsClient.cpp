@@ -22,6 +22,7 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     wsClientConfig.task_prio = 1;
     wsClientConfig.task_stack = 4096;
     wsClientConfig.buffer_size = 1024;
+    /*
     if (config.pingType == PING_BINARY)
     {
         wsClientConfig.ping_interval_sec = config.pingInterval;
@@ -34,6 +35,8 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
         wsClientConfig.pingpong_timeout_sec = 0;
         wsClientConfig.disable_pingpong_discon = false;
     }
+    */
+    wsClientConfig.disable_pingpong_discon = true;
     wsClientConfig.keep_alive_enable = true;
 
     if (config.authType & AUTH_TYPE_BASIC)
@@ -113,7 +116,6 @@ void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base,
     }
     else if (event_id == PROTOCOL_SEND_SIGMA_MESSAGE)
     {
-        Serial.printf("PROTOCOL_SEND_SIGMA_MESSAGE: %s\n", (char *)event_data);
         SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
         ws->sendWebSocketTextFrame(pkg.GetPkgString());
     }
@@ -136,24 +138,9 @@ void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base,
         ws->Close();
     }
 }
-/*
-void SigmaWsClient::Close()
-{
-    shouldConnect = false;
-    sendWebSocketCloseFrame();
-    if (wsClient != NULL)
-    {
-        esp_websocket_client_stop(wsClient);
-        esp_websocket_client_destroy(wsClient);
-        wsClient = NULL;
-    }
-    clearReconnectTimer(this);
-}
-*/
 
 void SigmaWsClient::wsEventHandler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
-    Serial.printf("wsEventHandler: event_id=%d\n", event_id);
     SigmaWsClient *ws = (SigmaWsClient *)handler_args;
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
 
@@ -328,15 +315,10 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     {
         ws->Log->Append("Received PING frame").Internal();
         esp_websocket_client_send_text(ws->wsClient, "PONG", 4, portMAX_DELAY);
-        // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PING,
-        //                   (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
         ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_PING);
     }
     else if (UpperPayload.startsWith("PONG"))
     {
-        ws->Log->Append("Received textPONG frame").Internal();
-        // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_PONG,
-        //                   (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
         ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_PONG);
     }
     else if (UpperPayload.startsWith("CLOSE"))
@@ -348,21 +330,15 @@ void SigmaWsClient::onDataText(String &payload, SigmaWsClient *ws)
     {
         ws->Log->Append("Received SigmaInternalPkg").Internal();
         SigmaInternalPkg pkg(payload);
-        // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE,
-        //                   (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
         ws->PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
         TopicSubscription *subscription = ws->GetSubscription(pkg.GetTopic());
         if (subscription != nullptr)
         {
-            // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), subscription->eventId,
-            //                   (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
             ws->PostMessageEvent(pkg.GetPkgString(), subscription->eventId);
         }
     }
     else
     {
-        // esp_event_post_to(ws->GetEventLoop(), ws->GetEventBase(), PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE,
-        //                   (void *)(payload.c_str()), payload.length() + 1, portMAX_DELAY);
         ws->PostMessageEvent(payload, PROTOCOL_RECEIVED_RAW_TEXT_MESSAGE);
     }
 }

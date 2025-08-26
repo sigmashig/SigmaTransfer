@@ -47,6 +47,7 @@ public:
     static int GetDecoded(String data, byte *encodedData);
     byte GetQos() { return pkgData.qos; };
     bool GetRetained() { return pkgData.retained; };
+    String Print();
 
 private:
     SigmaInternalStruct pkgData;

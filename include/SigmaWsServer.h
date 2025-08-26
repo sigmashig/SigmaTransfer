@@ -64,7 +64,6 @@ public:
         client.clientId = clientId;
         client.authKey = authKey;
         allowableClients[clientId] = client;
-        Serial.printf("AddAllowableClient: clientId: %s, authKey: %s, pingType: %d\n", client.clientId.c_str(), client.authKey.c_str());
     }
 
     void AddAllowableClient(AllowableClient client)

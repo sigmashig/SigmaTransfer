@@ -169,3 +169,16 @@ int SigmaInternalPkg::GetDecoded(String data, byte *encodedData)
     int length = GetDecodedLength(data.length());
     return base64_decode_chars(data.c_str(), length, (char *)encodedData);
 }
+
+String SigmaInternalPkg::Print()
+{
+    String str;
+    str = "topic: " + pkgData.topic + "#";
+    str += "payload: " + pkgData.payload + "#";
+    str += "clientId: " + pkgData.clientId + "#";
+    str += "qos: " + String(pkgData.qos) + "#";
+    str += "retained: " + String(pkgData.retained) + "#";
+    str += "isBinary: " + String(pkgData.isBinary) + "#";
+    str += "binaryPayloadLength: " + String(pkgData.binaryPayloadLength) + "#";
+    return str;
+}
