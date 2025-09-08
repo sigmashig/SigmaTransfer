@@ -86,9 +86,11 @@ protected:
 
     void setPingTimer(SigmaConnection *conn);
     void clearPingTimer(SigmaConnection *conn);
-    static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    void connectionHandler(int32_t event_id, void *event_data);
+    //static void networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
 private:
+
 };
 
 #endif

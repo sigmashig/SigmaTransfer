@@ -11,6 +11,13 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     pingInterval = config.pingInterval;
     retryConnectingDelay = 0; // No reconnect required
 
+    Log->Append("Registering network event handler").Internal();
+    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    if (espErr != ESP_OK)
+    {
+        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
+    }
+
     RegisterEventHandlers(PROTOCOL_SEND_SIGMA_MESSAGE, protocolEventHandler, this);
     RegisterEventHandlers(PROTOCOL_SEND_PING, protocolEventHandler, this);
     RegisterEventHandlers(PROTOCOL_SEND_PONG, protocolEventHandler, this);
@@ -706,7 +713,13 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
     SigmaWsServer *ws = (SigmaWsServer *)arg;
     SigmaInternalPkg pkg = SigmaInternalPkg((char *)event_data);
     ClientAuth *auth = nullptr;
-
+    //ws->Log->Append("protocolEventHandler:event_id:").Append(event_id).Internal();
+    //ws->Log->Append("Client numbers:").Append(ws->clients.size()).Internal();
+    if (ws->clients.size() == 0)
+    {
+        ws->Log->Append("No clients found").Error();
+        return;
+    }
     for (auto it = ws->clients.begin(); it != ws->clients.end(); it++)
     {
         if (it->second.clientId == pkg.GetClientId())
@@ -764,4 +777,10 @@ void SigmaWsServer::Subscribe(TopicSubscription subscriptionTopic)
     addSubscription(subscriptionTopic);
     Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
     // esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
+}
+
+void SigmaWsServer::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    SigmaWsServer *ws = (SigmaWsServer *)arg;
+    ws->connectionHandler(event_id, event_data);
 }

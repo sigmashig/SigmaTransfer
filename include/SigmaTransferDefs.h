@@ -159,6 +159,21 @@ typedef struct
 
 typedef struct
 {
+    String topic;
+    bool enabled = true;
+    struct
+    {
+        String name;
+        bool enabled;
+        int rxPin;
+        int txPin;
+        int baud;
+        String topic;
+    } gps;
+} TelemetryConfig;
+
+typedef struct
+{
     String clientId = "";
     String payload = "";
     bool isBinary = false;

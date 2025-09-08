@@ -25,6 +25,7 @@ SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoge
     {
         Log->Printf("Failed to create event loop: %d", espErr).Internal();
     }
+    /*
     Log->Append("Registering network event handler").Internal();
     espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (espErr != ESP_OK)
@@ -32,6 +33,7 @@ SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoge
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
     }
     Log->Append("Network event handler registered").Internal();
+    */
 }
 void SigmaConnection::PostMessageEvent(String message, int eventId)
 {
@@ -133,10 +135,50 @@ void SigmaConnection::clearPingTimer(SigmaConnection *conn)
     }
 }
 
+void SigmaConnection::connectionHandler(int32_t event_id, void *event_data)
+{
+    (void *)event_data;
+    switch (event_id)
+    {
+    case NETWORK_WAN_CONNECTED:
+    {
+        if (networkMode == NETWORK_MODE_WAN)
+        {
+            //Log->Append("[networkEventHandler]WAN connected").Internal();
+            Connect();
+        }
+        break;
+    }
+    case NETWORK_LAN_CONNECTED:
+    {
+        if (networkMode == NETWORK_MODE_LAN)
+        {
+            // conn->Log->Append("[networkEventHandler]LAN connected").Internal();
+            Connect();
+        }
+        break;
+    }
+    case NETWORK_WAN_DISCONNECTED:
+    {
+        // conn->Log->Append("[networkEventHandler]WAN disconnected").Internal();
+        Disconnect();
+        break;
+    }
+    case NETWORK_LAN_DISCONNECTED:
+    {
+        //Log->Append("[networkEventHandler]LAN disconnected").Internal();
+        Disconnect();
+        break;
+    }
+    }
+}
+
+/*
 void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     SigmaConnection *conn = (SigmaConnection *)arg;
     // conn->Log->Append("[networkEventHandler]event_id=").Append(event_id).Internal();
+    conn->Log->Printf("[networkEventHandler](%s) event_id=%d\n", conn->GetName().c_str(), event_id);
 
     switch (event_id)
     {
@@ -144,7 +186,7 @@ void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base
     {
         if (conn->networkMode == NETWORK_MODE_WAN)
         {
-            // conn->Log->Append("[networkEventHandler]WAN connected").Internal();
+            conn->Log->Append("[networkEventHandler]WAN connected").Internal();
             conn->Connect();
         }
         break;
@@ -172,27 +214,38 @@ void SigmaConnection::networkEventHandler(void *arg, esp_event_base_t event_base
     }
     }
 }
+*/
 
 SigmaConnection *SigmaConnection::Create(SigmaProtocolType type, SigmaConnectionsConfig config, SigmaLoger *logger, uint priority)
 {
+    SigmaConnection *conn = nullptr;
     switch (type)
     {
     case SIGMA_PROTOCOL_MQTT:
         logger->Append("Creating SigmaMQTT").Internal();
-        return new SigmaMQTT(config.mqttConfig, logger, priority);
+        conn = new SigmaMQTT(config.mqttConfig, logger, priority);
         break;
     case SIGMA_PROTOCOL_WS_SERVER:
         logger->Append("Creating SigmaWsServer").Internal();
-        return new SigmaWsServer(config.wsServerConfig, logger, priority);
+        conn = new SigmaWsServer(config.wsServerConfig, logger, priority);
         break;
     case SIGMA_PROTOCOL_WS_CLIENT:
         logger->Append("Creating SigmaWsClient").Internal();
-        return new SigmaWsClient(config.wsClientConfig, logger, priority);
+        conn = new SigmaWsClient(config.wsClientConfig, logger, priority);
         break;
     default:
-        return nullptr;
+        conn = nullptr;
+        break;
     }
-    return nullptr;
+    if (conn != nullptr)
+    {
+        conn->Log->Append("SigmaConnection created").Internal();
+    }
+    else
+    {
+        logger->Append("SigmaConnection creation failed").Internal();
+    }
+    return conn;
 }
 
 AuthType SigmaConnection::AuthTypeFromString(String typeName)

@@ -148,8 +148,8 @@ void setup()
   networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
   networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
   networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
-  networkConfig.wifiConfig.enabled = false;
-  networkConfig.ethernetConfig.enabled = true;
+  networkConfig.wifiConfig.enabled = true;
+  networkConfig.ethernetConfig.enabled = false;
   networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
   networkConfig.ethernetConfig.hardware.w5500.spiConfig.csPin = GPIO_NUM_5;
   networkConfig.ethernetConfig.hardware.w5500.rstPin = GPIO_NUM_4;
@@ -162,15 +162,39 @@ void setup()
   SigmaNetwork::GenerateMac(networkConfig.ethernetConfig.mac, 15);
 
   SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
+
+  SigmaConnectionsConfig config;
+
+
+  config.mqttConfig.server = "192.168.0.102";
+  config.mqttConfig.rootTopic = "test/test1";
+  config.mqttConfig.username = "test";
+  config.mqttConfig.password = "password";
+  config.mqttConfig.networkMode = NETWORK_MODE_LAN;
+  
+  config.wsServerConfig.port = 8080;
+  config.wsServerConfig.rootPath = "/";
+  config.wsServerConfig.enabled = true;
+  config.wsServerConfig.authType = AUTH_TYPE_FIRST_MESSAGE;
+  config.wsServerConfig.pingInterval = 10;
+  config.wsServerConfig.pingRetryCount = 3;
+  config.wsServerConfig.networkMode = NETWORK_MODE_LAN;
+ 
+
   Log->Append("Creating MQTT").Internal();
-  MqttConfig mqttConfig;
-  mqttConfig.server = "192.168.0.102";
-  mqttConfig.rootTopic = "test/test1";
-  mqttConfig.username = "test";
-  mqttConfig.password = "password";
-  mqttConfig.networkMode = NETWORK_MODE_LAN;
-  SigmaMQTT *Mqtt = new SigmaMQTT(mqttConfig, Log);
-  Log->Append("MQTT created").Internal();
+  SigmaMQTT *Mqtt = (SigmaMQTT *)SigmaConnection::Create(SigmaProtocolType::SIGMA_PROTOCOL_MQTT, config, Log);
+  if (Mqtt == NULL)
+  {
+    Log->Append("MQTT creation failed").Internal();
+    return;
+  }
+  SigmaWsServer *WsServer = (SigmaWsServer *)SigmaConnection::Create(SigmaProtocolType::SIGMA_PROTOCOL_WS_SERVER, config, Log);
+  if (WsServer == NULL)
+  {
+    Log->Append("WS Server creation failed").Internal();
+    return;
+  }
+  Log->Append("Connections created").Internal();
   protocol = Mqtt;
 
   espErr = Mqtt->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, Mqtt);

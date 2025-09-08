@@ -9,6 +9,15 @@
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", _config.networkMode, logger, priority)
 {
     config = _config;
+
+
+    Log->Append("Registering network event handler").Internal();
+    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    if (espErr != ESP_OK)
+    {
+        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
+    }
+
     retryConnectingCount = config.retryConnectingCount;
     retryConnectingDelay = config.retryConnectingDelay;
     pingInterval = config.pingInterval;
@@ -477,101 +486,8 @@ void SigmaWsClient::Subscribe(TopicSubscription subscriptionTopic)
     Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
 }
 
-/*
-bool SigmaWsClient::sendWebSocketFrame(const byte *_payload, size_t _payloadLen, byte opcode, bool isAuth)
+void SigmaWsClient::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    if (!isReady && !isAuth)
-    {
-        Log->Append("Cannot send message - not connected").Error();
-        return false;
-    }
-    byte *payload = (byte *)_payload;
-    size_t payloadLen = _payloadLen;
-    String jsonStr;
-
-    if (opcode == WS_TEXT && config.authType & AUTH_TYPE_ALL_MESSAGES)
-    {
-        // Convert to Json
-        // Text frame
-
-        JsonDocument doc;
-
-        doc["apiKey"] = config.apiKey;
-        doc["client"] = config.clientId;
-        doc["data"] = payload;
-        serializeJson(doc, jsonStr);
-
-        payload = (byte *)jsonStr.c_str();
-        payloadLen = jsonStr.length();
-    }
-
-    // Create WebSocket frame
-    // Format: FIN=1, RSV1-3=0, Opcode=1(text) or 2(binary)
-    // MASK=1 (client to server must be masked)
-    // Payload length + mask + payload
-
-    size_t headerSize = 2; // Basic header size
-
-    // Extended payload length
-    if (payloadLen > 125 && payloadLen < 65536)
-    {
-        headerSize += 2; // 16-bit length
-    }
-    else if (payloadLen >= 65536)
-    {
-        headerSize += 8; // 64-bit length
-    }
-
-    // Add mask size
-    headerSize += 4; // Masking key
-
-    // Create buffer
-    uint8_t *buffer = new uint8_t[headerSize + payloadLen];
-
-    // Set opcode and FIN bit
-    buffer[0] = 0x80 | (opcode & 0x0F); // FIN=1, opcode
-    // Log->Printf("hsize=%d,buffer[0]:0x%02x", headerSize, buffer[0]).Debug();
-
-    // Set payload length and mask bit
-    if (payloadLen <= 125)
-    {
-        buffer[1] = 0x80 | payloadLen; // MASK=1, length
-    }
-    else if (payloadLen < 65536)
-    {
-        buffer[1] = 0x80 | 126; // MASK=1, length=126
-        buffer[2] = (payloadLen >> 8) & 0xFF;
-        buffer[3] = payloadLen & 0xFF;
-    }
-    else
-    {
-        buffer[1] = 0x80 | 127; // MASK=1, length=127
-        for (int i = 0; i < 8; i++)
-        {
-            buffer[2 + i] = (payloadLen >> (56 - 8 * i)) & 0xFF;
-        }
-    }
-
-    // Generate random mask key
-    uint8_t maskKey[4];
-    for (int i = 0; i < 4; i++)
-    {
-        maskKey[i] = random(0, 256);
-    }
-
-    // Copy mask key
-    memcpy(buffer + (headerSize - 4), maskKey, 4);
-
-    for (size_t i = 0; i < payloadLen; i++)
-    {
-        buffer[headerSize + i] = payload[i] ^ maskKey[i % 4];
-    }
-
-    // Send frame
-    // Log->Printf("Send Frame[%d]", headerSize + payloadLen).Debug();
-    // Log->Printf("#%s#", (const char *)(buffer + headerSize)).Debug();
-    wsClient.add((const char *)buffer, headerSize + payloadLen);
-    delete[] buffer;
-    return wsClient.send();
+    SigmaWsClient *ws = (SigmaWsClient *)arg;
+    ws->connectionHandler(event_id, event_data);
 }
-    */

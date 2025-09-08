@@ -10,11 +10,21 @@ ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
 SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaMQTT", config.networkMode, logger, priority)
 {
+    esp_err_t espErr;
     this->config = config;
     pingInterval = 0; // MQTT doesn't support ping at this moment
     mqttClient = NULL;
     Log->Append("SigmaMQTT init. Network mode:").Append(config.networkMode).Internal();
-    if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
+    Log->Append("Registering network event handler").Internal();
+    espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    if (espErr != ESP_OK)
+    {
+        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
+    }
+
+
+    if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) 
+    || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
     {
         // init();
         Connect();
@@ -308,4 +318,10 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
         break;
     }
     }
+}
+
+void SigmaMQTT::networkEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    SigmaMQTT *mqtt = (SigmaMQTT *)arg;
+    mqtt->connectionHandler(event_id, event_data);
 }
