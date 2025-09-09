@@ -166,10 +166,12 @@ void SigmaMQTT::Connect()
     if (err != ESP_OK)
     {
         Log->Append("MQTT Connect failed:").Append(err).Error();
+        isReady = false;
     }
     else
     {
         Log->Append("MQTT Connect success").Internal();
+        isReady = true;
     }
 }
 
