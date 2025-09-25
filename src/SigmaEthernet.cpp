@@ -160,9 +160,6 @@ bool SigmaEthernet::Connect()
     //--------------------------------
 
     spi_device_handle_t spiHandle = nullptr;
-    /*
-    Serial.printf("SPIConfig: host=%d, miso=%d, mosi=%d, sck=%d, cs=%d, clkMHz=%d\n", config.hardware.w5500.spiConfig.spiHost, config.hardware.w5500.spiConfig.misoPin, config.hardware.w5500.spiConfig.mosiPin, config.hardware.w5500.spiConfig.sckPin, config.hardware.w5500.spiConfig.csPin, config.hardware.w5500.spiConfig.spiClockMHz);
-    */
     err = SigmaSPI::Initialize(config.hardware.w5500.spiConfig, &spiHandle);
     if (err != ESP_OK)
     {

@@ -391,7 +391,6 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
         else if (SigmaInternalPkg::IsSigmaInternalPkg(payloadStr))
         {
             SigmaInternalPkg pkg(payloadStr);
-            // Serial.printf("Internal Package:pkg.GetPkgString()=%s\n", pkg.GetPkgString().c_str());
             if (pkg.IsError())
             {
                 Log->Printf("Error in package: %s\n", pkg.GetPkgString().c_str()).Error();
@@ -407,10 +406,8 @@ void SigmaWsServer::handleTextPackage(uint8_t *payload, size_t len, int32_t sock
                 if (subscription != subscriptions.end())
                 {
                     Log->Printf("Sending event to subscription:").Append(subscription->second.eventId).Internal();
-                    // server->Log->Append("Sending event to subscription:").Append(server->name).Append("#").Append(subscription->second.eventId).Internal();
                     PostMessageEvent(pkg.GetPayload(), subscription->second.eventId);
                 }
-                //Log->Append("END").Internal();
                 PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
             }
         }
@@ -746,7 +743,6 @@ void SigmaWsServer::protocolEventHandler(void *arg, esp_event_base_t event_base,
         bool res;
         if (pkg.IsBinary())
         {
-            // Serial.println(pkg.GetPkgString().c_str());
             // res = ws->sendMessageToClient(pkg.GetClientId(), pkg.GetBinaryPayload(), pkg.GetBinaryPayloadLength());
         }
         else

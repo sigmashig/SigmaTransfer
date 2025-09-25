@@ -46,9 +46,6 @@ esp_err_t SigmaSPI::Initialize(SPIConfig &spiConfig, spi_device_handle_t *outDev
             return err;
         }
     }
-    /*
-    Serial.printf("SPIConfig: host=%d, miso=%d, mosi=%d, sck=%d, cs=%d, clkMHz=%d\n", spiConfig.spiHost, spiConfig.misoPin, spiConfig.mosiPin, spiConfig.sckPin, spiConfig.csPin, spiConfig.spiClockMHz);
-*/
     spi_device_interface_config_t devcfg = spiConfig.devcfg;
     if (devcfg.spics_io_num == UNUSED_PIN)
     {
@@ -62,9 +59,6 @@ esp_err_t SigmaSPI::Initialize(SPIConfig &spiConfig, spi_device_handle_t *outDev
     {
         devcfg.queue_size = SPI_QUEUE_SIZE;
     }
-    /*
-    Serial.printf("SPI Device: cmdBits=%d, addrBits=%d, mode=%d, clkSpeed=%d, csPin=%d, queueSize=%d\n", devcfg.command_bits, devcfg.address_bits, devcfg.mode, devcfg.clock_speed_hz, devcfg.spics_io_num, devcfg.queue_size);
-    */
     err = spi_bus_add_device(spiConfig.spiHost, &devcfg, outDevice);
     if (err != ESP_OK)
     {
