@@ -22,9 +22,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
     }
 
-
-    if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) 
-    || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
+    if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
     {
         // init();
         Connect();
@@ -193,26 +191,21 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 void SigmaMQTT::publish(SigmaInternalPkg *pkg)
 {
     String topic = config.rootTopic + (config.rootTopic.endsWith("/") ? "" : "/") + pkg->GetTopic();
-    Log->Append("P:[").Append(topic).Append("]#").Append(pkg->GetPayload()).Append("#").Internal();
-    // esp_mqtt_client_enqueue(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), 0, false, true);
+    // Log->Append("P:[").Append(topic).Append("]#").Append(pkg->GetPayload()).Append("#").Internal();
     esp_mqtt_client_publish(mqttClient, topic.c_str(), pkg->GetPayload().c_str(), pkg->GetPayload().length(), pkg->GetQos(), pkg->GetRetained());
 }
 
 void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     SigmaMQTT *mqtt = (SigmaMQTT *)handler_args;
-    // mqtt->Log->Append("onMqttEvent:").Append(event_id).Internal();
     esp_mqtt_event_id_t mqtt_event_id = (esp_mqtt_event_id_t)event_id;
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
-    // esp_mqtt_client_handle_t client = (*event)->client;
 
     switch (mqtt_event_id)
     {
     case MQTT_EVENT_CONNECTED:
     {
-        // mqtt->Log->Append("MQTT_EVENT_CONNECTED").Internal();
         mqtt->isReady = true;
-        // esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), PROTOCOL_CONNECTED, (void *)mqtt->name.c_str(), mqtt->name.length() + 1, portMAX_DELAY);
         mqtt->PostMessageEvent(mqtt->name, PROTOCOL_CONNECTED);
         for (auto const &x : mqtt->subscriptions)
         {
@@ -229,7 +222,6 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
     {
         mqtt->Log->Append("MQTT  DISCONNECTED").Error();
         mqtt->isReady = false;
-        // esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), PROTOCOL_DISCONNECTED, (void *)mqtt->name.c_str(), mqtt->name.length() + 1, portMAX_DELAY);
         mqtt->PostMessageEvent(mqtt->name, PROTOCOL_DISCONNECTED);
         // Try to reconnect later
         mqtt->setReconnectTimer(mqtt);
@@ -237,7 +229,6 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
     }
     case MQTT_EVENT_DATA:
     {
-        // mqtt->Log->Append("MQTT_EVENT_DATA").Internal();
         if (event->topic_len == 0)
         {
             mqtt->Log->Append("Topic length is zero. Ignore").Warn();
@@ -269,12 +260,10 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
             if (pkg.GetTopic() == x.first)
             {
                 int32_t e = (x.second.eventId == 0 ? PROTOCOL_RECEIVED_SIGMA_MESSAGE : x.second.eventId);
-                // esp_err_t res = esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), e, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
                 mqtt->PostMessageEvent(pkg.GetPkgString(), e);
                 return; // skip other subscription or event
             }
         }
-        // esp_event_post_to(mqtt->GetEventLoop(), mqtt->GetEventBase(), PROTOCOL_RECEIVED_SIGMA_MESSAGE, (void *)(pkg.GetPkgString().c_str()), pkg.GetPkgString().length() + 1, portMAX_DELAY);
         mqtt->PostMessageEvent(pkg.GetPkgString(), PROTOCOL_RECEIVED_SIGMA_MESSAGE);
 
         break;
