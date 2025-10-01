@@ -13,29 +13,30 @@ SigmaNetworkMgr::SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log)
     if (config.enabled)
     {
             
-        espErr = esp_netif_init();
+        Log->Append("Initializing esp_netif").Internal();
+       // espErr = esp_netif_init();
+        Log->Append("esp_netif initialized").Internal();
         if (espErr != ESP_OK && espErr != ESP_ERR_INVALID_STATE)
         {
-            Log->Printf("Failed to initialize esp_netif: %d", espErr).Internal();
+            Log->Printf("Failed to initialize esp_netif: %d", espErr).Error();
         }
         
         esp_event_loop_args_t loop_args = {
-            .queue_size = 100,
+            .queue_size = 50,
             .task_name = "SigmaNetworkMgr_event_loop",
-            .task_priority = 100, // high priority
+            .task_priority = 50, // high priority
             .task_stack_size = 4096,
             .task_core_id = 0};
-        espErr = ESP_OK;
         espErr = esp_event_loop_create(&loop_args, &eventLoop);
         if (espErr != ESP_OK)
         {
-            Log->Printf("Failed to create event loop: %d", espErr).Internal();
-            // exit(1);
+            Log->Printf("Failed to create event loop: %d", espErr).Error();
         }
         Log->Append("Event loop created").Internal();
         if (config.ethernetConfig.enabled)
         {
-            ethernet = new SigmaEthernet(config.ethernetConfig, Log);
+            Log->Append("Creating Ethernet").Internal();
+            //ethernet = new SigmaEthernet(config.ethernetConfig, Log);
         }
         else
         {
@@ -44,6 +45,7 @@ SigmaNetworkMgr::SigmaNetworkMgr(NetworkConfig config, SigmaLoger *log)
         }
         if (config.wifiConfig.enabled)
         {
+            Log->Append("Creating WiFi").Internal();
             wifi = new SigmaWiFi(config.wifiConfig, Log);
         }
         else
@@ -60,6 +62,7 @@ SigmaNetworkMgr::~SigmaNetworkMgr()
 
 void SigmaNetworkMgr::Connect()
 {
+    //Serial.printf("Connect.Eth=%d, Wifi=%d\n", ethernet != nullptr, wifi != nullptr);
     if (ethernet != nullptr)
     {
         ethernet->Connect();

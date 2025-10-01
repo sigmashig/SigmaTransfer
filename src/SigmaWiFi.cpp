@@ -14,6 +14,7 @@ SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
         // mode == WIFI_MODE_AP
         wifiStaReconnectTimer = nullptr;
     }
+  
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         switch (event)
@@ -51,6 +52,7 @@ SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
             break;
         }
         } });
+        
 }
 
 SigmaWiFi::~SigmaWiFi()
@@ -64,10 +66,10 @@ void SigmaWiFi::reconnectWiFiSta(TimerHandle_t xTimer)
 
 void SigmaWiFi::Connect()
 {
+    //Serial.printf("Connect Wifi:mode=%d\n", config.wifiMode);
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
         reconnectWiFiSta(nullptr);
-        // WiFi.begin(config.wifiSta.ssid.c_str(), config.wifiSta.password.c_str());
     }
     if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
     {

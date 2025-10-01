@@ -10,21 +10,23 @@ ESP_EVENT_DECLARE_BASE(SIGMATRANSFER_EVENT);
 
 SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaMQTT", config.networkMode, logger, priority)
 {
+
     esp_err_t espErr;
     this->config = config;
     pingInterval = 0; // MQTT doesn't support ping at this moment
     mqttClient = NULL;
+
     Log->Append("SigmaMQTT init. Network mode:").Append(config.networkMode).Internal();
     Log->Append("Registering network event handler").Internal();
+    
     espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
     if (espErr != ESP_OK)
     {
-        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
+        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Error();
     }
 
     if ((config.networkMode == NETWORK_MODE_LAN && SigmaNetworkMgr::IsLanConnected()) || (config.networkMode == NETWORK_MODE_WAN && SigmaNetworkMgr::IsWanConnected()))
     {
-        // init();
         Connect();
     }
 }
@@ -123,8 +125,8 @@ void SigmaMQTT::protocolEventHandler(void *arg, esp_event_base_t event_base, int
         bool res;
         mqtt->publish(&pkg);
     }
-}
 
+}
 void SigmaMQTT::Unsubscribe(String topic)
 {
     String fullTopic = config.rootTopic + topic;
@@ -185,7 +187,9 @@ void SigmaMQTT::Subscribe(TopicSubscription subscriptionTopic)
 
     addSubscription(subscriptionTopic);
     Log->Append("Subscribing to:").Append(subscriptionTopic.topic).Info();
-    esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
+    if (mqttClient != NULL) {
+        esp_mqtt_client_subscribe(mqttClient, subscriptionTopic.topic.c_str(), 0);
+    }
 }
 
 void SigmaMQTT::publish(SigmaInternalPkg *pkg)
@@ -232,6 +236,11 @@ void SigmaMQTT::onMqttEvent(void *handler_args, esp_event_base_t base, int32_t e
         if (event->topic_len == 0)
         {
             mqtt->Log->Append("Topic length is zero. Ignore").Warn();
+            break;
+        }
+        if (!mqtt->config.getLastState && !event->retain)
+        {
+            mqtt->Log->Append("Last state is retained. Ignore").Warn();
             break;
         }
         char *zTopic;

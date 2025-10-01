@@ -195,12 +195,13 @@ typedef struct
     String clientId = "Client_" + String(ESP.getEfuseMac(), HEX);
     int keepAlive = 60;
     bool enabled = true;
+    bool getLastState = false;
 } MqttConfig;
 
 typedef struct
 {
     String topic;
-    int32_t eventId = PROTOCOL_SEND_SIGMA_MESSAGE;
+    int32_t eventId = PROTOCOL_RECEIVED_SIGMA_MESSAGE;
     bool isReSubscribe = true;
 } TopicSubscription;
 

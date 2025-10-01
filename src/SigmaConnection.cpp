@@ -8,11 +8,11 @@
 
 SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoger *logger, uint priority, uint queueSize, uint stackSize, uint coreId)
 {
+
     this->Log = (logger != nullptr) ? logger : new SigmaLoger(0);
     this->name = name;
     this->networkMode = networkMode;
-    // messages = std::list<Message>();
-    // queueMutex = xSemaphoreCreateMutex();
+
     esp_event_loop_args_t loop_args = {
         .queue_size = (int32_t)queueSize,
         .task_name = name.c_str(),
@@ -25,15 +25,7 @@ SigmaConnection::SigmaConnection(String name, NetworkMode networkMode, SigmaLoge
     {
         Log->Printf("Failed to create event loop: %d", espErr).Internal();
     }
-    /*
-    Log->Append("Registering network event handler").Internal();
-    espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
-    if (espErr != ESP_OK)
-    {
-        Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
-    }
-    Log->Append("Network event handler registered").Internal();
-    */
+    
 }
 void SigmaConnection::PostMessageEvent(String message, int eventId)
 {

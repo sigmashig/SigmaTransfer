@@ -2,12 +2,6 @@
 #include "SigmaNetworkMgr.h"
 #include "SigmaSPI.h"
 
-extern "C"
-{
-#include "esp_log.h"
-#include "driver/gpio.h"
-}
-
 SigmaEthernet::SigmaEthernet(const EthernetConfig &config, SigmaLoger *log) : config(config), SigmaNetwork(log)
 {
 }
