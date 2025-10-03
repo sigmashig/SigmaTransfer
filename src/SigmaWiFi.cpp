@@ -55,8 +55,14 @@ void SigmaWiFi::handleWiFiEvent(esp_event_base_t eventBase, int32_t eventId, voi
 
 bool SigmaWiFi::Begin()
 {
+    if (!config.enabled)
+    {
+        SigmaNetworkMgr::GetLog()->Append("WiFi is disabled").Internal();
+        return false;
+    }
 
     esp_err_t err;
+    SigmaNetworkMgr::Init(); // init event loop and netif
     SigmaNetworkMgr::GetLog()->Append("WiFi Init").Internal();
 
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
@@ -121,12 +127,9 @@ bool SigmaWiFi::Begin()
 
             esp_netif_ip_info_t ip_info;
             IPAddress ip = config.wifiSta.ip;
-
-            ip_info.ip.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
-            ip = config.wifiSta.gateway;
-            ip_info.gw.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
-            ip = config.wifiSta.subnet;
-            ip_info.netmask.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
+            esp_netif_str_to_ip4(config.wifiSta.ip.toString().c_str(), &ip_info.ip);
+            esp_netif_str_to_ip4(config.wifiSta.gateway.toString().c_str(), &ip_info.gw);
+            esp_netif_str_to_ip4(config.wifiSta.subnet.toString().c_str(), &ip_info.netmask);
 
             esp_netif_set_ip_info(netif1, &ip_info);
         }
@@ -193,7 +196,11 @@ bool SigmaWiFi::reconnectWiFiSta(TimerHandle_t xTimer)
 
 bool SigmaWiFi::Connect()
 {
-
+    if (!config.enabled)
+    {
+        SigmaNetworkMgr::GetLog()->Append("WiFi is disabled").Internal();
+        return false;
+    }
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
         if (!reconnectWiFiSta(wifiStaReconnectTimer))

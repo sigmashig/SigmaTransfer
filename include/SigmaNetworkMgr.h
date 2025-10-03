@@ -14,10 +14,10 @@ class SigmaNetworkMgr
 public:
     static SigmaNetwork *AddNetwork(const NetworkConfig &config);
     /*
-    * Add multiple networks. This method is not tested deeply. Please use it with caution.
-    */ 
+     * Add multiple networks. This method is not tested deeply. Please use it with caution.
+     */
     static bool AddNetworks(const std::vector<NetworkConfig> &configs);
-     
+
     static bool RemoveNetwork(String name);
     static bool RemoveNetworks(std::vector<String> names);
     static bool Connect();
@@ -32,6 +32,7 @@ public:
     static SigmaLoger *GetLog() { return Log; };
     static void SetLog(SigmaLoger *log);
     static IPAddress GetIpAddress(String name);
+    static bool Init();
 
 private:
     inline static SigmaLoger *Log = nullptr;
@@ -43,8 +44,6 @@ private:
     //  TimerHandle_t wifiStaReconnectTimer;
     inline static esp_event_loop_handle_t eventLoop = nullptr;
     inline static esp_event_base_t eventBase = "SigmaNetworkMgr";
-
-    static bool init();
 };
 
 #endif

@@ -88,8 +88,8 @@ void setup()
   wifiConfig.networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
   wifiConfig.networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
   wifiConfig.networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
-  wifiConfig.networkConfig.wifiConfig.enabled = true;
-  wifiConfig.networkConfig.wifiConfig.wifiSta.useDhcp = false;
+  wifiConfig.networkConfig.wifiConfig.enabled = false;
+  wifiConfig.networkConfig.wifiConfig.wifiSta.useDhcp = true;
   wifiConfig.networkConfig.wifiConfig.wifiSta.ip = IPAddress(192, 168, 0, 222);
   wifiConfig.networkConfig.wifiConfig.wifiSta.dns = IPAddress(8, 8, 8, 8);
   wifiConfig.networkConfig.wifiConfig.wifiSta.gateway = IPAddress(192, 168, 0, 1);
@@ -101,14 +101,14 @@ void setup()
   ethernetConfig.networkConfig.ethernetConfig.enabled = true;
   ethernetConfig.networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
   ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.spiConfig.csPin = GPIO_NUM_5;
-  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.rstPin = GPIO_NUM_4;
-  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.intPin = GPIO_NUM_15;
+  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.rstPin = GPIO_NUM_21;
+  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.intPin = GPIO_NUM_17;
   ethernetConfig.networkConfig.ethernetConfig.dhcp = true;
   ethernetConfig.networkConfig.ethernetConfig.ip = IPAddress(192, 168, 0, 222);
   ethernetConfig.networkConfig.ethernetConfig.dns = IPAddress(8, 8, 8, 8);
   ethernetConfig.networkConfig.ethernetConfig.gateway = IPAddress(192, 168, 0, 1);
   ethernetConfig.networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
-  //SigmaNetwork::GenerateMac(ethernetConfig.networkConfig.ethernetConfig.mac, 15);
+  // SigmaNetwork::GenerateMac(ethernetConfig.networkConfig.ethernetConfig.mac, 15);
   /*
     networkConfig.ethernetConfig.enabled = false;
     networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
@@ -126,11 +126,11 @@ void setup()
   std::vector<NetworkConfig> networks;
   networks.push_back(wifiConfig);
   networks.push_back(ethernetConfig);
-  //if (!SigmaNetworkMgr::AddNetworks(networks))
-  if(SigmaNetworkMgr::AddNetwork(wifiConfig) == nullptr)
+  // if(SigmaNetworkMgr::AddNetwork(wifiConfig) == nullptr)
+  if (!SigmaNetworkMgr::AddNetworks(networks))
   {
     Log->Append("Failed to add network").Internal();
-    return;
+    // return;
   }
 
   SigmaConnectionsConfig configA;
@@ -166,7 +166,6 @@ void setup()
     return;
   }
 
-
   Log->Append("Connections created").Internal();
 
   espErr = MqttA->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, MqttA);
@@ -179,8 +178,6 @@ void setup()
   {
     Log->Printf("Failed to register event handler (MqttB): %d", espErr).Internal();
   }
-  Log->Printf("MqttA: %p", MqttA).Internal();
-  Log->Printf("MqttB: %p", MqttB).Internal();
   Log->Append("Subscribing to testListen").Internal();
   TopicSubscription subscription;
   subscription.topic = "testListen";

@@ -25,7 +25,7 @@ public:
 
     esp_netif_t *GetNetif() const override { return netifHandle; }
     IPAddress GetIpAddress() const override;
-    bool Begin() override { return true; };
+    bool Begin() override;
 
 private:
     //static constexpr int GPIO_ISR_FLAGS = 0; // default flags for gpio_install_isr_service
@@ -38,7 +38,7 @@ private:
     EthernetConfig config;
     esp_netif_t *netifHandle = nullptr;
     esp_eth_handle_t ethHandle = nullptr;
-    bool isNetifInited = false;
+//    bool isNetifInited = false;
     // bool isLinkUp = false;
     // bool isGotIp = false;
     bool GetIpInfo(esp_netif_ip_info_t *out) const;

@@ -4,7 +4,7 @@
 #include "SigmaWiFi.h"
 #include "SigmaEthernet.h"
 
-bool SigmaNetworkMgr::init()
+bool SigmaNetworkMgr::Init()
 {
     if (isInitialized)
     {
@@ -47,12 +47,11 @@ bool SigmaNetworkMgr::init()
     return true;
 }
 
-
 SigmaNetwork *SigmaNetworkMgr::AddNetwork(const NetworkConfig &config)
 {
     if (!isInitialized)
     {
-        init();
+        Init();
     }
     if (networks.find(config.name) != networks.end())
     {
@@ -63,10 +62,20 @@ SigmaNetwork *SigmaNetworkMgr::AddNetwork(const NetworkConfig &config)
         SigmaNetwork *network = nullptr;
         if (config.type == NETWORK_WIFI)
         {
+            if (!config.networkConfig.wifiConfig.enabled)
+            {
+                Log->Printf("[NM]WiFi is disabled").Warn();
+                return nullptr;
+            }
             network = new SigmaWiFi(config.networkConfig.wifiConfig);
         }
         else if (config.type == NETWORK_ETHERNET)
         {
+            if (!config.networkConfig.ethernetConfig.enabled)
+            {
+                Log->Printf("[NM]Ethernet is disabled").Warn();
+                return nullptr;
+            }
             network = new SigmaEthernet(config.networkConfig.ethernetConfig);
         }
         if (network != nullptr)
@@ -236,13 +245,13 @@ esp_err_t SigmaNetworkMgr::PostEvent(int32_t eventId, void *eventData, size_t ev
 
 esp_err_t SigmaNetworkMgr::RegisterEventHandlerInstance(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg, esp_event_handler_instance_t *instance)
 {
-   // return esp_event_handler_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg);
-   return esp_event_handler_instance_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg, instance);
+    // return esp_event_handler_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg);
+    return esp_event_handler_instance_register_with(eventLoop, eventBase, event_id, event_handler, event_handler_arg, instance);
 }
 
 esp_err_t SigmaNetworkMgr::UnRegisterEventHandlerInstance(int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg, esp_event_handler_instance_t *instance)
 {
-   return esp_event_handler_instance_unregister_with(eventLoop, eventBase, event_id, instance);
+    return esp_event_handler_instance_unregister_with(eventLoop, eventBase, event_id, instance);
 }
 
 esp_netif_t *SigmaNetworkMgr::GetNetif(String name)

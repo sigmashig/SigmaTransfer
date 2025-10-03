@@ -11,7 +11,6 @@
 class SigmaNetwork
 {
 public:
-
     virtual bool Connect() = 0;
     virtual bool Disconnect() = 0;
     virtual bool IsConnected() { return isConnected; };
@@ -24,9 +23,16 @@ public:
     static void StringToMAC(String macString, byte mac[6]);
     static EthernetHardwareType EthernetHardwareTypeFromString(String hardwareType);
     virtual bool Begin() = 0;
-    virtual esp_netif_t *GetNetif() const { if (netif1 != nullptr) return netif1; else return netif2; };
+    virtual esp_netif_t *GetNetif() const
+    {
+        if (netif1 != nullptr)
+            return netif1;
+        else
+            return netif2;
+    };
     virtual esp_netif_t *GetNetifFirst() const { return netif1; };
     virtual esp_netif_t *GetNetifSecond() const { return netif2; };
+    static void GenerateMac(byte mac[6], byte id = 0xFF);
 
 protected:
     bool isConnected = false;
@@ -34,11 +40,9 @@ protected:
     bool isLinkUp = false;
     esp_netif_t *netif1 = nullptr;
     esp_netif_t *netif2 = nullptr;
- 
+
     SigmaNetwork();
     ~SigmaNetwork();
-    static void GenerateMac(byte mac[6], byte id = 0xFF);
-
 };
 
 #endif
