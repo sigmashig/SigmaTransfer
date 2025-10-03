@@ -82,13 +82,33 @@ void setup()
   Log = new SigmaLoger(512);
 
   esp_err_t espErr = ESP_OK;
-  NetworkConfig networkConfig;
-  networkConfig.name = "wifi";
-  networkConfig.type = NETWORK_WIFI;
-  networkConfig.networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
-  networkConfig.networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
-  networkConfig.networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
-  networkConfig.networkConfig.wifiConfig.enabled = true;
+  NetworkConfig wifiConfig;
+  wifiConfig.name = "wifi";
+  wifiConfig.type = NETWORK_WIFI;
+  wifiConfig.networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
+  wifiConfig.networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
+  wifiConfig.networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
+  wifiConfig.networkConfig.wifiConfig.enabled = true;
+  wifiConfig.networkConfig.wifiConfig.wifiSta.useDhcp = false;
+  wifiConfig.networkConfig.wifiConfig.wifiSta.ip = IPAddress(192, 168, 0, 222);
+  wifiConfig.networkConfig.wifiConfig.wifiSta.dns = IPAddress(8, 8, 8, 8);
+  wifiConfig.networkConfig.wifiConfig.wifiSta.gateway = IPAddress(192, 168, 0, 1);
+  wifiConfig.networkConfig.wifiConfig.wifiSta.subnet = IPAddress(255, 255, 255, 0);
+
+  NetworkConfig ethernetConfig;
+  ethernetConfig.name = "ethernet";
+  ethernetConfig.type = NETWORK_ETHERNET;
+  ethernetConfig.networkConfig.ethernetConfig.enabled = true;
+  ethernetConfig.networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
+  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.spiConfig.csPin = GPIO_NUM_5;
+  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.rstPin = GPIO_NUM_4;
+  ethernetConfig.networkConfig.ethernetConfig.hardware.w5500.intPin = GPIO_NUM_15;
+  ethernetConfig.networkConfig.ethernetConfig.dhcp = true;
+  ethernetConfig.networkConfig.ethernetConfig.ip = IPAddress(192, 168, 0, 222);
+  ethernetConfig.networkConfig.ethernetConfig.dns = IPAddress(8, 8, 8, 8);
+  ethernetConfig.networkConfig.ethernetConfig.gateway = IPAddress(192, 168, 0, 1);
+  ethernetConfig.networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
+  //SigmaNetwork::GenerateMac(ethernetConfig.networkConfig.ethernetConfig.mac, 15);
   /*
     networkConfig.ethernetConfig.enabled = false;
     networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
@@ -103,7 +123,11 @@ void setup()
     SigmaNetwork::GenerateMac(networkConfig.ethernetConfig.mac, 15);
   */
   SigmaNetworkMgr::SetLog(Log);
-  if (SigmaNetworkMgr::AddNetwork(networkConfig) == nullptr)
+  std::vector<NetworkConfig> networks;
+  networks.push_back(wifiConfig);
+  networks.push_back(ethernetConfig);
+  //if (!SigmaNetworkMgr::AddNetworks(networks))
+  if(SigmaNetworkMgr::AddNetwork(wifiConfig) == nullptr)
   {
     Log->Append("Failed to add network").Internal();
     return;

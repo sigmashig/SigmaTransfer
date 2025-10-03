@@ -57,12 +57,21 @@ typedef struct
 {
     String ssid;
     String password;
+    bool useDhcp = true;
+    IPAddress ip;
+    IPAddress gateway;
+    IPAddress dns;
+    IPAddress subnet;
+
 } WiFiConfigSta;
 
 typedef struct
 {
     String ssid;
     String password;
+    bool hidden = false;
+    uint16_t channel = 0;
+    wifi_auth_mode_t authMode = WIFI_AUTH_WPA2_PSK;
 } WiFiConfigAp;
 
 typedef struct

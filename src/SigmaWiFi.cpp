@@ -99,7 +99,7 @@ bool SigmaWiFi::Begin()
         SigmaNetworkMgr::GetLog()->Error("Failed to set WiFi mode");
         return false;
     }
-  
+
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
         SigmaNetworkMgr::GetLog()->Append("Creating default WiFi STA netif").Internal();
@@ -109,6 +109,28 @@ bool SigmaWiFi::Begin()
             SigmaNetworkMgr::GetLog()->Error("Failed to create default WiFi STA netif");
             return false;
         }
+
+        if (!config.wifiSta.useDhcp)
+        {
+            esp_netif_dhcp_status_t dhcpStatus;
+            esp_netif_dhcpc_get_status(netif1, &dhcpStatus);
+            if (dhcpStatus != ESP_NETIF_DHCP_STOPPED)
+            {
+                esp_netif_dhcpc_stop(netif1);
+            }
+
+            esp_netif_ip_info_t ip_info;
+            IPAddress ip = config.wifiSta.ip;
+
+            ip_info.ip.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
+            ip = config.wifiSta.gateway;
+            ip_info.gw.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
+            ip = config.wifiSta.subnet;
+            ip_info.netmask.addr = ip[3] << 24 | ip[2] << 16 | ip[1] << 8 | ip[0];
+
+            esp_netif_set_ip_info(netif1, &ip_info);
+        }
+
         wifi_config_t sta_config = {};
         strncpy(reinterpret_cast<char *>(sta_config.sta.ssid), config.wifiSta.ssid.c_str(), sizeof(sta_config.sta.ssid));
         strncpy(reinterpret_cast<char *>(sta_config.sta.password), config.wifiSta.password.c_str(), sizeof(sta_config.sta.password));
@@ -163,8 +185,8 @@ bool SigmaWiFi::reconnectWiFiSta(TimerHandle_t xTimer)
     err = esp_wifi_connect();
     if (err != ESP_OK)
     {
-        Serial.printf("ReconnectWiFiSta: Failed to reconnect WiFi STA:(%d)%s\n",err,esp_err_to_name(err));
-        SigmaNetworkMgr::GetLog()->Printf("Failed to reconnect WiFi STA:(%d)%s",err,esp_err_to_name(err)).Error();
+        Serial.printf("ReconnectWiFiSta: Failed to reconnect WiFi STA:(%d)%s\n", err, esp_err_to_name(err));
+        SigmaNetworkMgr::GetLog()->Printf("Failed to reconnect WiFi STA:(%d)%s", err, esp_err_to_name(err)).Error();
     }
     return err == ESP_OK;
 }
