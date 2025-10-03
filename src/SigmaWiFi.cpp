@@ -1,91 +1,210 @@
 #include "SigmaWiFi.h"
 #include "SigmaNetworkMgr.h"
+#include <esp_wifi_default.h>
+#include <esp_wifi.h>
 
-SigmaWiFi::SigmaWiFi(WiFiConfig config, SigmaLoger *log)
+SigmaWiFi::SigmaWiFi(WiFiConfig config)
 {
-    Log = log != nullptr ? log : new SigmaLoger(0);
     this->config = config;
-    if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
+};
+
+void SigmaWiFi::onWiFiEvent(void *arg, esp_event_base_t eventBase, int32_t eventId, void *eventData)
+{
+    auto *self = static_cast<SigmaWiFi *>(arg);
+    self->handleWiFiEvent(eventBase, eventId, eventData);
+}
+
+void SigmaWiFi::handleWiFiEvent(esp_event_base_t eventBase, int32_t eventId, void *eventData)
+{
+    SigmaNetworkMgr::GetLog()->Append("WiFi event: " + String(eventBase) + " " + String(eventId)).Error();
+    if (eventBase == IP_EVENT)
     {
-        wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
-    }
-    else
-    {
-        // mode == WIFI_MODE_AP
-        wifiStaReconnectTimer = nullptr;
-    }
-  
-    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        switch (event)
-        {
-        case SYSTEM_EVENT_STA_GOT_IP:
+        if (eventId == IP_EVENT_STA_GOT_IP)
         {
             xTimerStop(wifiStaReconnectTimer, portMAX_DELAY);
-            Log->Append("WiFi connected. IP address:").Append(WiFi.localIP().toString()).Info();
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)eventData;
+            IPAddress ip = IPAddress(event->ip_info.ip.addr);
+            SigmaNetworkMgr::GetLog()->Append("WiFi connected. IP address:").Append(ip.toString()).Info();
             isConnected = true;
-            IPAddress ip = WiFi.localIP();
             SigmaNetworkMgr::PostEvent(NETWORK_STA_CONNECTED, &ip, sizeof(ip));
-            break;
         }
-        case SYSTEM_EVENT_STA_DISCONNECTED:
+    }
+    else if (eventBase == WIFI_EVENT)
+    {
+        switch (eventId)
         {
-            if (isConnected) {
-                Log->Append("WiFi disconnected:").Append(info.wifi_sta_disconnected.reason).Error();
-                SigmaNetworkMgr::PostEvent(NETWORK_STA_DISCONNECTED, &info.wifi_sta_disconnected.reason, sizeof(info.wifi_sta_disconnected.reason)+1);
+        case WIFI_EVENT_STA_DISCONNECTED:
+        {
+            if (isConnected)
+            {
+                wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)eventData;
+                SigmaNetworkMgr::GetLog()->Append("WiFi STA disconnected:").Error();
+                String msg = "Reason" + String(event->reason);
+                SigmaNetworkMgr::PostEvent(NETWORK_STA_DISCONNECTED, &msg, msg.length() + 1);
             }
             isConnected = false;
-            if (this->config.shouldReconnect) {
+            if (this->config.shouldReconnect)
+            {
                 xTimerStart(wifiStaReconnectTimer, portMAX_DELAY);
             }
             break;
         }
-        case SYSTEM_EVENT_WIFI_READY:
-        case SYSTEM_EVENT_STA_START:
-        case SYSTEM_EVENT_STA_CONNECTED:
-        { // known event - do nothing
-            break;
         }
-        default:
-        {
-            Log->Append("WiFi event: ").Append(event).Internal();
-            break;
-        }
-        } });
-        
+    }
 }
 
+bool SigmaWiFi::Begin()
+{
+
+    esp_err_t err;
+    SigmaNetworkMgr::GetLog()->Append("WiFi Init").Internal();
+
+    if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
+    {
+        wifiStaReconnectTimer = xTimerCreate("wifiStaTimer", pdMS_TO_TICKS(2000), pdFALSE, this, reinterpret_cast<TimerCallbackFunction_t>(reconnectWiFiSta));
+    }
+    else
+    {
+        wifiStaReconnectTimer = nullptr;
+    }
+    SigmaNetworkMgr::GetLog()->Append("Heap before WiFi init: ").Append(esp_get_free_heap_size()).Internal();
+    SigmaNetworkMgr::GetLog()->Append("Initializing WiFi config").Internal();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    err = esp_wifi_init(&cfg);
+
+    if (err != ESP_OK)
+    {
+        SigmaNetworkMgr::GetLog()->Error("Failed to initialize WiFi");
+        return false;
+    }
+    SigmaNetworkMgr::GetLog()->Append("Heap after WiFi init: ").Append(esp_get_free_heap_size()).Internal();
+    SigmaNetworkMgr::GetLog()->Append("Registering WiFi event handler").Internal();
+    err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &onWiFiEvent, this);
+    if (err != ESP_OK)
+    {
+        SigmaNetworkMgr::GetLog()->Error("Failed to register WiFi event handler");
+        return false;
+    }
+    SigmaNetworkMgr::GetLog()->Append("Registering IP event handler").Internal();
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &onWiFiEvent, this);
+    if (err != ESP_OK)
+    {
+        SigmaNetworkMgr::GetLog()->Error("Failed to register IP event handler");
+        return false;
+    }
+    SigmaNetworkMgr::GetLog()->Append("Setting WiFi mode").Internal();
+    err = esp_wifi_set_mode(config.wifiMode);
+    if (err != ESP_OK)
+    {
+        SigmaNetworkMgr::GetLog()->Error("Failed to set WiFi mode");
+        return false;
+    }
+  
+    if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
+    {
+        SigmaNetworkMgr::GetLog()->Append("Creating default WiFi STA netif").Internal();
+        netif1 = esp_netif_create_default_wifi_sta();
+        if (netif1 == nullptr)
+        {
+            SigmaNetworkMgr::GetLog()->Error("Failed to create default WiFi STA netif");
+            return false;
+        }
+        wifi_config_t sta_config = {};
+        strncpy(reinterpret_cast<char *>(sta_config.sta.ssid), config.wifiSta.ssid.c_str(), sizeof(sta_config.sta.ssid));
+        strncpy(reinterpret_cast<char *>(sta_config.sta.password), config.wifiSta.password.c_str(), sizeof(sta_config.sta.password));
+        sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+        sta_config.sta.pmf_cfg.capable = true;
+        sta_config.sta.pmf_cfg.required = false;
+        sta_config.sta.pmf_cfg.required = false;
+        SigmaNetworkMgr::GetLog()->Append("Setting WiFi STA config").Internal();
+        err = esp_wifi_set_config(WIFI_IF_STA, &sta_config);
+        if (err != ESP_OK)
+        {
+            SigmaNetworkMgr::GetLog()->Error("Failed to set WiFi STA config");
+            return false;
+        }
+    }
+    if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
+    {
+        netif2 = esp_netif_create_default_wifi_ap();
+        if (netif2 == nullptr)
+        {
+            SigmaNetworkMgr::GetLog()->Error("Failed to create default WiFi AP netif");
+            return false;
+        }
+        wifi_config_t ap_config = {};
+        strncpy(reinterpret_cast<char *>(ap_config.ap.ssid), config.wifiAp.ssid.c_str(), sizeof(ap_config.ap.ssid));
+        strncpy(reinterpret_cast<char *>(ap_config.ap.password), config.wifiAp.password.c_str(), sizeof(ap_config.ap.password));
+        ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+        err = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
+        if (err != ESP_OK)
+        {
+            SigmaNetworkMgr::GetLog()->Error("Failed to set WiFi AP config");
+            return false;
+        }
+    }
+    SigmaNetworkMgr::GetLog()->Append("Starting WiFi").Internal();
+    err = esp_wifi_start();
+    if (err != ESP_OK)
+    {
+        SigmaNetworkMgr::GetLog()->Error("Failed to start WiFi");
+        return false;
+    }
+    SigmaNetworkMgr::GetLog()->Append("WiFi initialized").Internal();
+    return Connect();
+}
 SigmaWiFi::~SigmaWiFi()
 {
 }
 
-void SigmaWiFi::reconnectWiFiSta(TimerHandle_t xTimer)
+bool SigmaWiFi::reconnectWiFiSta(TimerHandle_t xTimer)
 {
-    WiFi.begin(config.wifiSta.ssid.c_str(), config.wifiSta.password.c_str());
+    esp_err_t err;
+    err = esp_wifi_connect();
+    if (err != ESP_OK)
+    {
+        Serial.printf("ReconnectWiFiSta: Failed to reconnect WiFi STA:(%d)%s\n",err,esp_err_to_name(err));
+        SigmaNetworkMgr::GetLog()->Printf("Failed to reconnect WiFi STA:(%d)%s",err,esp_err_to_name(err)).Error();
+    }
+    return err == ESP_OK;
 }
 
-void SigmaWiFi::Connect()
+bool SigmaWiFi::Connect()
 {
-    //Serial.printf("Connect Wifi:mode=%d\n", config.wifiMode);
+
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
-        reconnectWiFiSta(nullptr);
+        if (!reconnectWiFiSta(wifiStaReconnectTimer))
+        {
+            SigmaNetworkMgr::GetLog()->Append("(2)Failed to reconnect WiFi STA").Error();
+            return false;
+        }
     }
     if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
     {
-        // mode == WIFI_MODE_AP
-        WiFi.softAP(config.wifiAp.ssid.c_str(), config.wifiAp.password.c_str());
+        // Nothing todo - wifi is started in Begin()
     }
+    return true;
 }
 
-void SigmaWiFi::Disconnect()
+bool SigmaWiFi::Disconnect()
 {
+    esp_err_t err;
     if (config.wifiMode == WIFI_MODE_STA || config.wifiMode == WIFI_MODE_APSTA)
     {
-        WiFi.disconnect();
+        err = esp_wifi_disconnect();
+        if (err != ESP_OK)
+        {
+            SigmaNetworkMgr::GetLog()->Error("Failed to disconnect WiFi");
+            return false;
+        }
     }
-    if (config.wifiMode == WIFI_MODE_AP || config.wifiMode == WIFI_MODE_APSTA)
+
+    err = esp_wifi_stop();
+    if (err != ESP_OK)
     {
-        WiFi.softAPdisconnect(true);
+        SigmaNetworkMgr::GetLog()->Error("Failed to stop WiFi");
+        return false;
     }
+    return true;
 }

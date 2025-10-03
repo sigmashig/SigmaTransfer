@@ -1,9 +1,8 @@
 
 #include "SigmaNetwork.h"
 
-SigmaNetwork::SigmaNetwork(SigmaLoger *log)
+SigmaNetwork::SigmaNetwork()
 {
-    Log = log != nullptr ? log : new SigmaLoger(0);
 }
 
 SigmaNetwork::~SigmaNetwork()

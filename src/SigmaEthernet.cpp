@@ -2,7 +2,7 @@
 #include "SigmaNetworkMgr.h"
 #include "SigmaSPI.h"
 
-SigmaEthernet::SigmaEthernet(const EthernetConfig &config, SigmaLoger *log) : config(config), SigmaNetwork(log)
+SigmaEthernet::SigmaEthernet(const EthernetConfig &config) : config(config)
 {
 }
 
@@ -15,7 +15,7 @@ bool SigmaEthernet::GetIpInfo(esp_netif_ip_info_t *out) const
 {
     if (!netifHandle)
     {
-        Log->Append("GetIpInfo: netifHandle is null").Error();
+        SigmaNetworkMgr::GetLog()->Append("GetIpInfo: netifHandle is null").Error();
         return false;
     }
     return esp_netif_get_ip_info(netifHandle, out) == ESP_OK;
@@ -37,25 +37,31 @@ void SigmaEthernet::handleEthEvent(int32_t id)
     {
     case ETHERNET_EVENT_CONNECTED:
         isLinkUp = true;
-        Log->Append("Ethernet Link Up").Internal();
+        SigmaNetworkMgr::GetLog()->Append("Ethernet Link Up").Internal();
         break;
     case ETHERNET_EVENT_DISCONNECTED:
+    {
         isLinkUp = false;
         isGotIp = false;
         isConnected = false;
-        Log->Append("Ethernet Link Down").Internal();
-        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet Link is down", 0);
+        String msg = "Ethernet Link is down";
+        SigmaNetworkMgr::GetLog()->Append(msg).Internal();
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)msg.c_str(), msg.length() + 1);
         break;
+    }
     case ETHERNET_EVENT_START:
-        Log->Append("Ethernet Started").Internal();
+        SigmaNetworkMgr::GetLog()->Append("Ethernet Started").Internal();
         break;
     case ETHERNET_EVENT_STOP:
-        Log->Append("Ethernet Stopped").Internal();
+    {
+        SigmaNetworkMgr::GetLog()->Append("Ethernet Stopped").Internal();
         isLinkUp = false;
         isGotIp = false;
         isConnected = false;
-        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)"Ethernet stopped", 0);
+        String msg = "Ethernet stopped";
+        SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_DISCONNECTED, (void *)msg.c_str(), msg.length() + 1);
         break;
+    }
     default:
         break;
     }
@@ -66,7 +72,7 @@ void SigmaEthernet::handleIpGot()
     isGotIp = true;
     isConnected = true;
     IPAddress ip = GetIpAddress();
-    Log->Append("Ethernet connected. IP address:").Append(ip.toString()).Info();
+    SigmaNetworkMgr::GetLog()->Append("Ethernet connected. IP address:").Append(ip.toString()).Info();
     SigmaNetworkMgr::PostEvent(NETWORK_ETHERNET_CONNECTED, &ip, sizeof(ip));
 }
 
@@ -109,7 +115,7 @@ bool SigmaEthernet::initBoard(spi_device_handle_t spiHandle)
         err = esp_eth_driver_install(&eth_config, &ethHandle);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] esp_eth_driver_install failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_eth_driver_install failed").Error();
             return false;
         }
         // Log->Append("W5500 initialized").Internal();
@@ -129,49 +135,47 @@ bool SigmaEthernet::Connect()
         err = esp_netif_init();
         if (err != ESP_OK)
         {
-            Log->Append("[Error] esp_netif_init failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_init failed").Error();
             return false;
         }
         err = esp_event_loop_create_default();
         if (err != ESP_OK)
         {
-            Log->Append("[Error] esp_event_loop_create_default failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_event_loop_create_default failed").Error();
             return false;
         }
         isNetifInited = true;
     }
 
-    // Log->Append("Creating netif").Internal();
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
     netifHandle = esp_netif_new(&netif_cfg);
     if (!netifHandle)
     {
-        Log->Append("[Error] esp_netif_new failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_new failed").Error();
         return false;
     }
-    // Log->Append("netif created").Internal();
-
+ 
     //--------------------------------
 
     spi_device_handle_t spiHandle = nullptr;
     err = SigmaSPI::Initialize(config.hardware.w5500.spiConfig, &spiHandle);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] SPI initialization failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] SPI initialization failed").Error();
         return false;
     }
     // Log->Append("SPI initialized").Internal();
-    err = gpio_install_isr_service(SigmaEthernet::GPIO_ISR_FLAGS);
+    err = gpio_install_isr_service(0);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
     {
-        Log->Append("[Error] gpio_install_isr_service failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] gpio_install_isr_service failed").Error();
         return false;
     }
     // Log->Append("GPIO ISR service installed").Internal();
 
     if (!initBoard(spiHandle))
     {
-        Log->Append("[Error] initBoard failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] initBoard failed").Error();
         return false;
     }
 
@@ -180,7 +184,7 @@ bool SigmaEthernet::Connect()
     err = esp_eth_ioctl(ethHandle, ETH_CMD_S_MAC_ADDR, config.mac);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] esp_eth_ioctl failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_eth_ioctl failed").Error();
         return false;
     }
 
@@ -189,20 +193,20 @@ bool SigmaEthernet::Connect()
     err = esp_netif_attach(netifHandle, glue);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] esp_netif_attach failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_attach failed").Error();
         return false;
     }
     // Register events
     err = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &SigmaEthernet::onEthEvent, this);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] esp_event_handler_register failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_event_handler_register failed").Error();
         return false;
     }
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &SigmaEthernet::onIpEvent, this);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] esp_event_handler_register failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_event_handler_register failed").Error();
         return false;
     }
     // DHCP or static IP
@@ -211,7 +215,7 @@ bool SigmaEthernet::Connect()
         err = esp_netif_dhcpc_start(netifHandle);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] esp_netif_dhcpc_start failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_dhcpc_start failed").Error();
         }
     }
     if (!config.dhcp || err != ESP_OK)
@@ -219,7 +223,7 @@ bool SigmaEthernet::Connect()
         err = esp_netif_dhcpc_stop(netifHandle);
         if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
         {
-            Log->Append("[Error] esp_netif_dhcpc_stop failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_dhcpc_stop failed").Error();
         }
         esp_netif_ip_info_t ip_info = {};
         char buf[16];
@@ -227,19 +231,19 @@ bool SigmaEthernet::Connect()
         err = esp_netif_str_to_ip4(buf, &ip_info.ip);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] IP Address is wrong:").Append(buf).Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] IP Address is wrong:").Append(buf).Error();
         }
         snprintf(buf, sizeof(buf), "%u.%u.%u.%u", config.gateway[0], config.gateway[1], config.gateway[2], config.gateway[3]);
         err = esp_netif_str_to_ip4(buf, &ip_info.gw);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] Gateway Address is wrong:").Append(buf).Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] Gateway Address is wrong:").Append(buf).Error();
         }
         snprintf(buf, sizeof(buf), "%u.%u.%u.%u", config.subnet[0], config.subnet[1], config.subnet[2], config.subnet[3]);
         err = esp_netif_str_to_ip4(buf, &ip_info.netmask);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] Subnet Address is wrong:").Append(buf).Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] Subnet Address is wrong:").Append(buf).Error();
         }
         err = esp_netif_set_ip_info(netifHandle, &ip_info);
 
@@ -248,22 +252,22 @@ bool SigmaEthernet::Connect()
         err = esp_netif_str_to_ip4(buf, &dns_info.ip.u_addr.ip4);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] DNS Address is wrong:").Append(buf).Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] DNS Address is wrong:").Append(buf).Error();
         }
         dns_info.ip.type = ESP_IPADDR_TYPE_V4;
         err = esp_netif_set_dns_info(netifHandle, ESP_NETIF_DNS_MAIN, &dns_info);
         if (err != ESP_OK)
         {
-            Log->Append("[Error] esp_netif_set_dns_info failed").Error();
+            SigmaNetworkMgr::GetLog()->Append("[Error] esp_netif_set_dns_info failed").Error();
         }
     }
     err = esp_eth_start(ethHandle);
     if (err != ESP_OK)
     {
-        Log->Append("[Error] esp_eth_start failed").Error();
+        SigmaNetworkMgr::GetLog()->Append("[Error] esp_eth_start failed").Error();
         return false;
     }
-    Log->Append("Ethernet started").Internal();
+    SigmaNetworkMgr::GetLog()->Append("Ethernet started").Internal();
 
     return true;
 }

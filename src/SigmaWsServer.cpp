@@ -12,7 +12,7 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
     retryConnectingDelay = 0; // No reconnect required
 
     Log->Append("Registering network event handler").Internal();
-    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlerInstance(ESP_EVENT_ANY_ID, networkEventHandler, this, eventHInstance);
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
@@ -44,6 +44,10 @@ SigmaWsServer::SigmaWsServer(WSServerConfig config, SigmaLoger *logger, int prio
 
 SigmaWsServer::~SigmaWsServer()
 {
+    if (eventHInstance)
+    {
+        SigmaNetworkMgr::UnRegisterEventHandlerInstance(ESP_EVENT_ANY_ID, networkEventHandler, this, eventHInstance);
+    }
 }
 
 esp_err_t SigmaWsServer::onWsEvent(httpd_req_t *req)
@@ -525,7 +529,7 @@ void SigmaWsServer::Connect()
             .is_websocket = true};
         httpd_register_uri_handler(server, &ws_uri);
 
-        Log->Append("WebSocket server started on ws://").Append(WiFi.localIP().toString()).Append(config.rootPath).Append(":").Append(config.port).Internal();
+      //  Log->Append("WebSocket server started on ws://").Append(WiFi.localIP().toString()).Append(config.rootPath).Append(":").Append(config.port).Internal();
         setReady(true);
         PostMessageEvent("CONNECTED", PROTOCOL_CONNECTED);
     }

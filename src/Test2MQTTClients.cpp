@@ -3,7 +3,6 @@
 #include <SigmaNetworkMgr.h>
 #include <SigmaMQTT.h>
 
-
 SigmaLoger *Log;
 SigmaMQTT *MqttA;
 SigmaMQTT *MqttB;
@@ -70,27 +69,27 @@ void protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
   {
     Log->Internal("Unknown event");
     Log->Append("Protocol:").Append(protocol->GetName()).Append(" Base:").Append(event_base).Append("#ID: ").Append(event_id).Internal();
-
   }
   Log->Append("Protocol event end").Internal();
 }
 
-
 void setup()
 {
-    Serial.begin(115200);
-    Serial.setDebugOutput(true);
-    Serial.println("\n----Hello, World!-----");
+  Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println("\n----Hello, World!-----");
 
-    Log = new SigmaLoger(512);
+  Log = new SigmaLoger(512);
 
-    esp_err_t espErr = ESP_OK;
-    NetworkConfig networkConfig;
-    networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
-    networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
-    networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
-    networkConfig.wifiConfig.enabled = true;
-  /*  
+  esp_err_t espErr = ESP_OK;
+  NetworkConfig networkConfig;
+  networkConfig.name = "wifi";
+  networkConfig.type = NETWORK_WIFI;
+  networkConfig.networkConfig.wifiConfig.wifiSta.ssid = "Sigma_Guest";
+  networkConfig.networkConfig.wifiConfig.wifiSta.password = "Passwd#123";
+  networkConfig.networkConfig.wifiConfig.wifiMode = WIFI_MODE_STA;
+  networkConfig.networkConfig.wifiConfig.enabled = true;
+  /*
     networkConfig.ethernetConfig.enabled = false;
     networkConfig.ethernetConfig.hardwareType = ETHERNET_HARDWARE_TYPE_W5500;
     networkConfig.ethernetConfig.hardware.w5500.spiConfig.csPin = GPIO_NUM_5;
@@ -103,54 +102,86 @@ void setup()
     networkConfig.ethernetConfig.subnet = IPAddress(255, 255, 255, 0);
     SigmaNetwork::GenerateMac(networkConfig.ethernetConfig.mac, 15);
   */
-    SigmaNetworkMgr *network = new SigmaNetworkMgr(networkConfig, Log);
-  
-    SigmaConnectionsConfig config;
-  
-  
-    config.mqttConfig.server = "192.168.0.102";
-    config.mqttConfig.rootTopic = "test";
-    config.mqttConfig.username = "test";
-    config.mqttConfig.password = "password";
-    config.mqttConfig.networkMode = NETWORK_MODE_LAN;
-    
-   
-    Log->Append("Creating MQTT").Internal();
-    SigmaMQTT *MqttA = (SigmaMQTT *)SigmaConnection::Create(SigmaProtocolType::SIGMA_PROTOCOL_MQTT, config, Log);
-    if (MqttA == NULL)
-    {
-      Log->Append("MQTT A creation failed").Internal();
-      return;
-    }
-    Log->Append("Connections created").Internal();
-    
-    espErr = MqttA->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, MqttA);
-    if (espErr != ESP_OK)
-    {
-      Log->Printf("Failed to register event handler: %d", espErr).Internal();
-    }
-    Log->Append("event handler registered").Internal();
-    Log->Append("Subscribing to testListen").Internal();
-    TopicSubscription subscription;
-    subscription.topic = "testListen";
-    subscription.isReSubscribe = true;
-    MqttA->Subscribe(subscription);
-    Log->Append("Connecting to network").Internal();
-    network->Connect();
-    // delay(10000);
-    // network->GetEthernet()->Connect();
-    Log->Append("Waiting for protocol to be ready").Internal();
-    while (MqttA->IsReady() == false)
-    {
-      delay(100);
-    }
-    Log->Append("MQTT A is ready").Internal();
-    Log->Append("Setup end").Internal();
-  
+  SigmaNetworkMgr::SetLog(Log);
+  if (SigmaNetworkMgr::AddNetwork(networkConfig) == nullptr)
+  {
+    Log->Append("Failed to add network").Internal();
+    return;
+  }
 
+  SigmaConnectionsConfig configA;
+
+  configA.mqttConfig.server = "192.168.0.102";
+  configA.mqttConfig.rootTopic = "test";
+  configA.mqttConfig.username = "test";
+  configA.mqttConfig.password = "password";
+  configA.mqttConfig.networkMode = NETWORK_MODE_LAN;
+  configA.mqttConfig.clientId = "MqttA";
+
+  Log->Append("Creating MQTTA").Internal();
+  SigmaMQTT *MqttA = (SigmaMQTT *)SigmaConnection::Create(SigmaProtocolType::SIGMA_PROTOCOL_MQTT, configA, Log);
+  if (MqttA == NULL)
+  {
+    Log->Append("MQTT A creation failed").Internal();
+    return;
+  }
+  SigmaConnectionsConfig configB;
+
+  configB.mqttConfig.server = "192.168.0.99";
+  configB.mqttConfig.rootTopic = "test";
+  configB.mqttConfig.username = "";
+  configB.mqttConfig.password = "";
+  configB.mqttConfig.networkMode = NETWORK_MODE_LAN;
+  configB.mqttConfig.clientId = "MqttB";
+
+  Log->Append("Creating MQTTB").Internal();
+  SigmaMQTT *MqttB = (SigmaMQTT *)SigmaConnection::Create(SigmaProtocolType::SIGMA_PROTOCOL_MQTT, configB, Log);
+  if (MqttB == NULL)
+  {
+    Log->Append("MQTT B creation failed").Internal();
+    return;
+  }
+
+
+  Log->Append("Connections created").Internal();
+
+  espErr = MqttA->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, MqttA);
+  if (espErr != ESP_OK)
+  {
+    Log->Printf("Failed to register event handler (MqttA): %d", espErr).Internal();
+  }
+  espErr = MqttB->RegisterEventHandlers(ESP_EVENT_ANY_ID, protocolEventHandler, MqttB);
+  if (espErr != ESP_OK)
+  {
+    Log->Printf("Failed to register event handler (MqttB): %d", espErr).Internal();
+  }
+  Log->Printf("MqttA: %p", MqttA).Internal();
+  Log->Printf("MqttB: %p", MqttB).Internal();
+  Log->Append("Subscribing to testListen").Internal();
+  TopicSubscription subscription;
+  subscription.topic = "testListen";
+  subscription.isReSubscribe = true;
+  MqttA->Subscribe(subscription);
+  MqttB->Subscribe(subscription);
+  Log->Append("Connecting to network").Internal();
+  SigmaNetworkMgr::Connect();
+  // delay(10000);
+  // network->GetEthernet()->Connect();
+  Log->Append("Waiting for protocol to be ready").Internal();
+  while (MqttA->IsReady() == false)
+  {
+    delay(100);
+  }
+  Log->Append("MQTT A is ready").Internal();
+  while (MqttB->IsReady() == false)
+  {
+    delay(100);
+  }
+  Log->Append("MQTT B is ready").Internal();
+  Log->Append("Setup end").Internal();
 }
 
 void loop()
 {
-    vTaskDelete(NULL);
+  vTaskDelete(NULL);
 }

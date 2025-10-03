@@ -1,7 +1,7 @@
 #include "SigmaMQTT.h"
 #include "SigmaInternalPkg.h"
 #include <esp_event.h>
-#include <WiFi.h>
+//#include <WiFi.h>
 #include <string.h>
 #include <SigmaLoger.h>
 #include "SigmaNetworkMgr.h"
@@ -19,7 +19,7 @@ SigmaMQTT::SigmaMQTT(MqttConfig config, SigmaLoger *logger, uint priority) : Sig
     Log->Append("SigmaMQTT init. Network mode:").Append(config.networkMode).Internal();
     Log->Append("Registering network event handler").Internal();
     
-    espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    espErr = SigmaNetworkMgr::RegisterEventHandlerInstance(ESP_EVENT_ANY_ID,networkEventHandler, this, eventHInstance);
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Error();
@@ -106,6 +106,10 @@ void SigmaMQTT::init()
 SigmaMQTT::~SigmaMQTT()
 {
     // Clean up allocated memory
+    if (eventHInstance)
+    {
+        SigmaNetworkMgr::UnRegisterEventHandlerInstance(ESP_EVENT_ANY_ID, networkEventHandler, this, eventHInstance);
+    }
     if (mqttClient)
     {
         esp_mqtt_client_stop(mqttClient);

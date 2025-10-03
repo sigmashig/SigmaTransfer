@@ -3,7 +3,7 @@
 #include <libb64/cencode.h>
 #include "SigmaNetworkMgr.h"
 #include "SigmaInternalPkg.h"
-#include <WiFi.h>
+//#include <WiFi.h>
 #include <esp_event.h>
 
 SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint priority) : SigmaConnection("SigmaWsClient", _config.networkMode, logger, priority)
@@ -12,7 +12,7 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
 
 
     Log->Append("Registering network event handler").Internal();
-    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlers(ESP_EVENT_ANY_ID, networkEventHandler, this);
+    esp_err_t espErr = SigmaNetworkMgr::RegisterEventHandlerInstance(ESP_EVENT_ANY_ID, networkEventHandler, this, eventHInstance);
     if (espErr != ESP_OK)
     {
         Log->Printf("Failed to register NETWORK event handler: %d", espErr).Internal();
@@ -106,6 +106,14 @@ SigmaWsClient::SigmaWsClient(WSClientConfig _config, SigmaLoger *logger, uint pr
     //{
     //     Log->Append("Failed to create ping timer").Internal();
     // }
+}
+
+SigmaWsClient::~SigmaWsClient()
+{
+    if (eventHInstance)
+    {
+        SigmaNetworkMgr::UnRegisterEventHandlerInstance(ESP_EVENT_ANY_ID, networkEventHandler, this, eventHInstance);
+    }
 }
 
 void SigmaWsClient::protocolEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)

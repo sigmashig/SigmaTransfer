@@ -32,6 +32,7 @@ public:
     // "pingType" is optional. If not provided, it will be set to NO_PING.
     //            available values: NO_PING, PING_ONLY_TEXT, PING_ONLY_BINARY
     SigmaWsClient(WSClientConfig config, SigmaLoger *logger = nullptr, uint priority = 5);
+    ~SigmaWsClient();
 
 private:
     WSClientConfig config;

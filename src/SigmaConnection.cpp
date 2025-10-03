@@ -1,5 +1,5 @@
 #include "SigmaConnection.h"
-#include <WiFi.h>
+//#include <WiFi.h>
 #include <esp_event.h>
 #include <SigmaMQTT.h>
 #include <SigmaWSServer.h>
@@ -129,6 +129,7 @@ void SigmaConnection::clearPingTimer(SigmaConnection *conn)
 
 void SigmaConnection::connectionHandler(int32_t event_id, void *event_data)
 {
+    Log->Printf("connectionHandler for %s[%d](%p)", GetName().c_str(), event_id, this).Internal();
     (void *)event_data;
     switch (event_id)
     {

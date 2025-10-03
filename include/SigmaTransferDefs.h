@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
-#include <WiFi.h>
+// #include <WiFi.h>
+#include <esp_wifi_types.h>
 #include <map>
 #include <new>
 extern "C"
@@ -94,6 +95,12 @@ enum EthernetHardwareType
     ETHERNET_HARDWARE_TYPE_NONE = 0xFF
 };
 
+typedef enum{
+    NETWORK_WIFI = 0,
+    NETWORK_ETHERNET = 1,
+    NETWORK_UNKNOWN = 0xFF
+} NetworkType;
+
 typedef struct W5500Config
 {
     int rstPin;
@@ -152,9 +159,14 @@ struct EthernetConfig
 
 typedef struct
 {
-    WiFiConfig wifiConfig;
-    EthernetConfig ethernetConfig;
+    String name = "";
     bool enabled = true;
+    NetworkType type = NETWORK_UNKNOWN;
+    struct
+    {
+        WiFiConfig wifiConfig;
+        EthernetConfig ethernetConfig;
+    } networkConfig;
 } NetworkConfig;
 
 typedef struct

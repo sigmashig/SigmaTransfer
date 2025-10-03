@@ -65,6 +65,8 @@ protected:
     int retryConnectingCount = 3;
     uint retryConnectingDelay = 1000;
     NetworkMode networkMode = NETWORK_MODE_NONE;
+    esp_event_handler_instance_t *eventHInstance = nullptr;
+
 
     virtual void Disconnect() = 0;
     virtual void Close() = 0;
